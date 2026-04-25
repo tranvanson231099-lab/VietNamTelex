@@ -1,14 +1,15 @@
-import { CursorManager } from "./src/core/cursor_manager.js";
+import { IMEBuffer } from "./src/core/ime_buffer.js";
 
 let contextID = -1;
-let lastWord = "";
 
 // =====================
 // FOCUS
 // =====================
 chrome.input.ime.onFocus.addListener((context) => {
   contextID = context.contextID;
-  lastWord = "";
+
+  IMEBuffer.text = "";
+  IMEBuffer.cursor = 0;
 });
 
 // =====================
@@ -16,7 +17,6 @@ chrome.input.ime.onFocus.addListener((context) => {
 // =====================
 chrome.input.ime.onBlur.addListener(() => {
   contextID = -1;
-  lastWord = "";
 });
 
 // =====================
@@ -31,24 +31,28 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
   // BACKSPACE
   // =====================
   if (keyData.key === "Backspace") {
-    return false; // để Chrome xử lý
+    IMEBuffer.deleteBackward();
+
+    chrome.input.ime.setComposition({
+      contextID,
+      text: IMEBuffer.text,
+      cursor: IMEBuffer.cursor
+    });
+
+    return true;
   }
 
   // =====================
   // CHARACTER INPUT
   // =====================
   if (keyData.code.startsWith("Key")) {
+    IMEBuffer.insert(keyData.key);
 
-    const char = keyData.key;
-
-    lastWord += char;
-
-    console.log("WORD:", lastWord);
-
-    // ⚠️ CHỈ commit CHAR, KHÔNG dùng buffer replace
-    chrome.input.ime.commitText({
+    // 🔥 HIỂN THỊ CHỮ ĐANG GÕ (BUFFER)
+    chrome.input.ime.setComposition({
       contextID,
-      text: char
+      text: IMEBuffer.text,
+      cursor: IMEBuffer.cursor
     });
 
     return true;
