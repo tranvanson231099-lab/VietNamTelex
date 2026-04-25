@@ -12,26 +12,21 @@ chrome.input.ime.onBlur.addListener(() => {
 
 // Xử lý sự kiện bàn phím
 chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
-  // Chỉ xử lý khi nhấn phím xuống (keydown)
-  if (keyData.type !== "keydown") return false;
+  // Chỉ xử lý khi có context và là keydown
+  if (contextID === -1 || keyData.type !== 'keydown') {
+    return false;
+  }
 
-  // Bỏ qua nếu đang nhấn tổ hợp phím chức năng (Ctrl, Alt, Meta)
-  if (keyData.ctrlKey || keyData.altKey || keyData.metaKey) return false;
-
-  /**
-   * KIỂM TRA PHÍM CHỮ (a-z):
-   * keyData.code của các phím chữ luôn có định dạng "KeyA", "KeyB",... "KeyZ"
-   * Cách này loại bỏ mọi phím hệ thống (Space, Enter, Backspace) mà không cần lập danh sách.
-   */
-  if (keyData.code.startsWith("Key")) {
+  // Chỉ xử lý các phím in được (có độ dài là 1)
+  if (keyData.key.length === 1) {
     chrome.input.ime.commitText({
       contextID: contextID,
       text: keyData.key
     });
-
-    return true; // Đã xử lý, chặn trình duyệt tự gõ ký tự gốc
+    // Đã xử lý, không để trình duyệt gõ lại
+    return true;
   }
 
-  // Mọi phím khác (số, ký tự đặc biệt, phím điều hướng) -> Để hệ thống tự xử lý
+  // Cho phép các phím khác (Backspace, Enter, mũi tên...) hoạt động bình thường
   return false;
 });
