@@ -15,25 +15,23 @@ chrome.input.ime.onBlur.addListener(() => {
 });
 
 // =====================
-// KEY EVENT (PASS THROUGH FIXED)
+// KEY EVENT (RAW PASS THROUGH)
 // =====================
 chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
   if (keyData.type !== "keydown" || contextID === -1) {
     return false;
   }
 
-  // bỏ Ctrl/Alt/Meta
+  // bỏ Ctrl / Alt / Meta
   if (keyData.ctrlKey || keyData.altKey || keyData.metaKey) {
     return false;
   }
 
-  // =====================
-  // FORWARD ALL KEYS TO CHROME
-  // =====================
+  // forward toàn bộ phím về Chrome
   chrome.input.ime.sendKeyEvents({
     contextID,
     keyData: [keyData]
   });
 
-  return true; // QUAN TRỌNG: báo đã xử lý
+  return true;
 });

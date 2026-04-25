@@ -4,9 +4,9 @@
   "version": "1.0",
   "description": "Tools for Vietnamese language.",
   "author": "Sơn",
-  "permissions": [
-    "input"
-  ],
+
+  "minimum_chrome_version": "108",
+
   "input_components": [
     {
       "name": "Vietnamese Telex",
@@ -17,6 +17,7 @@
       "layouts": ["us"]
     }
   ],
+
   "background": {
     "service_worker": "background.js",
     "type": "module"
