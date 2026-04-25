@@ -7,7 +7,7 @@ export const IMEBuffer = {
     const after = this.text.slice(this.cursor);
 
     this.text = before + char + after;
-    this.cursor++;
+    this.cursor += char.length;
   },
 
   deleteBackward() {

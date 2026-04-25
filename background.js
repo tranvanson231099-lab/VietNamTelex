@@ -1,9 +1,8 @@
 import { IMEBuffer } from "./src/core/ime_buffer.js";
+import { CursorManager } from "./src/core/cursor_manager.js";
 
 let contextID = -1;
 
-// =====================
-// FOCUS
 // =====================
 chrome.input.ime.onFocus.addListener((context) => {
   contextID = context.contextID;
@@ -13,14 +12,10 @@ chrome.input.ime.onFocus.addListener((context) => {
 });
 
 // =====================
-// BLUR
-// =====================
 chrome.input.ime.onBlur.addListener(() => {
   contextID = -1;
 });
 
-// =====================
-// KEY EVENT
 // =====================
 chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
   if (keyData.type !== "keydown" || contextID === -1) return false;
@@ -37,7 +32,7 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
   }
 
   // =====================
-  // SPACE → COMMIT WORD
+  // SPACE → COMMIT
   // =====================
   if (keyData.key === " ") {
     commitWord(" ");
@@ -45,7 +40,7 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
   }
 
   // =====================
-  // ENTER → COMMIT WORD
+  // ENTER → COMMIT
   // =====================
   if (keyData.key === "Enter") {
     commitWord("\n");
@@ -65,35 +60,35 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
 });
 
 // =====================
-// RENDER COMPOSITION (FIXED)
+// RENDER (COMPOSITION FIXED)
 // =====================
 function render() {
   if (contextID === -1) return;
 
-  const text = IMEBuffer.text;
+  const word = CursorManager.getWordFromBuffer(IMEBuffer);
+
+  console.log("WORD:", word);
 
   chrome.input.ime.setComposition({
     contextID,
-    text: text,
+    text: IMEBuffer.text,
     cursor: IMEBuffer.cursor
   }, () => {
     if (chrome.runtime.lastError) {
-      console.warn("Composition error:", chrome.runtime.lastError.message);
+      console.warn(chrome.runtime.lastError.message);
     }
   });
 }
 
 // =====================
-// COMMIT WORD (FIXED)
+// COMMIT WORD
 // =====================
 function commitWord(extra = "") {
   if (contextID === -1) return;
 
-  const finalText = IMEBuffer.text + extra;
-
   chrome.input.ime.commitText({
     contextID,
-    text: finalText
+    text: IMEBuffer.text + extra
   });
 
   IMEBuffer.text = "";
