@@ -15,43 +15,25 @@ chrome.input.ime.onBlur.addListener(() => {
 });
 
 // =====================
-// KEY EVENT (PASS THROUGH)
+// KEY EVENT (PASS THROUGH FIXED)
 // =====================
 chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
-  if (keyData.type !== "keydown" || contextID === -1) return false;
+  if (keyData.type !== "keydown" || contextID === -1) {
+    return false;
+  }
 
   // bỏ Ctrl/Alt/Meta
-  if (keyData.ctrlKey || keyData.altKey || keyData.metaKey) return false;
-
-  // =====================
-  // BACKSPACE
-  // =====================
-  if (keyData.key === "Backspace") {
-    chrome.input.ime.sendKeyEvents({
-      contextID,
-      keyData: [keyData]
-    });
-    return true;
+  if (keyData.ctrlKey || keyData.altKey || keyData.metaKey) {
+    return false;
   }
 
   // =====================
-  // ENTER / SPACE / NORMAL KEYS
+  // FORWARD ALL KEYS TO CHROME
   // =====================
-  if (keyData.key && keyData.key.length === 1) {
-    chrome.input.ime.sendKeyEvents({
-      contextID,
-      keyData: [keyData]
-    });
-    return true;
-  }
+  chrome.input.ime.sendKeyEvents({
+    contextID,
+    keyData: [keyData]
+  });
 
-  if (keyData.key === "Enter" || keyData.key === " ") {
-    chrome.input.ime.sendKeyEvents({
-      contextID,
-      keyData: [keyData]
-    });
-    return true;
-  }
-
-  return false;
+  return true; // QUAN TRỌNG: báo đã xử lý
 });
