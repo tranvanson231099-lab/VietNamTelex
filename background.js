@@ -2,7 +2,7 @@ import { CursorManager } from './src/core/cursor_manager.js';
 
 let contextID = -1;
 
-// 1. Theo dõi Focus/Blur để quản lý contextID
+// 1. Focus / Blur
 chrome.input.ime.onFocus.addListener((context) => {
   contextID = context.contextID;
 });
@@ -11,43 +11,59 @@ chrome.input.ime.onBlur.addListener(() => {
   contextID = -1;
 });
 
-// 2. Cập nhật vị trí con trỏ và dữ liệu văn bản xung quanh
+// 2. cập nhật cursor
 chrome.input.ime.onSurroundingTextChanged.addListener((engineID, info) => {
   if (info) {
     CursorManager.update(info);
+
     console.log("Cursor Position:", CursorManager.getCursorIndex());
-    console.log("Current Word:", CursorManager.getCurrentWord());
+    console.log("Current Word:", CursorManager.getFullWord());
   }
 });
 
-// 3. Xử lý sự kiện bàn phím
+// ============================
+// 🔥 FIX IME ENGINE CHÍNH
+// ============================
 chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
-  // Bỏ qua nếu không phải sự kiện nhấn phím hoặc đang mất focus
   if (keyData.type !== "keydown" || contextID === -1) {
     return false;
   }
 
-  // Bỏ qua nếu có phím chức năng hệ thống (Ctrl, Alt, Meta)
   if (keyData.ctrlKey || keyData.altKey || keyData.metaKey) {
     return false;
   }
 
-  // CHỈ can thiệp các phím từ a-z (KeyA, KeyB, ..., KeyZ)
+  // chỉ xử lý chữ
   if (keyData.code.startsWith("Key")) {
-    
-    // Ở ĐÂY LÀ NƠI XỬ LÝ LOGIC TIẾNG VIỆT
-    // Bạn có thể dùng CursorManager.getCurrentWord() để phân tích từ cũ
-    // Ví dụ: const word = CursorManager.getCurrentWord();
-    
-    // Gửi văn bản vào ô nhập liệu
-    chrome.input.ime.commitText({
-      contextID: contextID,
-      text: keyData.key
+
+    const cursor = CursorManager.getCursorIndex();
+    const { start, end } = CursorManager.getFullWordRange();
+
+    const oldWord = CursorManager.getFullWord();
+
+    // 👉 logic tiếng Việt (tạm thời nối chữ)
+    const newWord = oldWord + keyData.key;
+
+    // ==========================
+    // 🔥 FIX QUAN TRỌNG NHẤT
+    // ==========================
+
+    // 1. xoá word cũ
+    chrome.input.ime.deleteSurroundingText({
+      contextID,
+      offset: start - cursor,
+      length: end - start
     });
 
-    return true; // Chặn Chrome gõ ký tự gốc (tránh bị lặp chữ)
+    // 2. insert word mới
+    chrome.input.ime.commitText({
+      contextID,
+      text: newWord
+    });
+
+    return true;
   }
 
-  // Các phím khác (Số, Backspace, Enter, Space, Điều hướng) -> Trả cho hệ thống xử lý
+  // space / enter / number / backspace
   return false;
 });
