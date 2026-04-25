@@ -8,6 +8,7 @@ let contextID = -1;
 // =====================
 chrome.input.ime.onFocus.addListener((context) => {
   contextID = context.contextID;
+
   IMEBuffer.text = "";
   IMEBuffer.cursor = 0;
 });
@@ -32,6 +33,12 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
   // =====================
   if (keyData.key === "Backspace") {
     IMEBuffer.deleteBackward();
+
+    chrome.input.ime.commitText({
+      contextID,
+      text: ""
+    });
+
     return true;
   }
 
@@ -47,6 +54,12 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
     );
 
     console.log("WORD:", word);
+
+    // 🔥 QUAN TRỌNG NHẤT: gửi ra UI
+    chrome.input.ime.commitText({
+      contextID,
+      text: keyData.key
+    });
 
     return true;
   }
