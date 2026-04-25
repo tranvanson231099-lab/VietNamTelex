@@ -2,21 +2,8 @@
   "manifest_version": 3,
   "name": "Vietnamese Tools",
   "version": "1.0",
-  "description": "Tools for Vietnamese language.",
+  "description": "Clean extension",
   "author": "Sơn",
-
-  "minimum_chrome_version": "108",
-
-  "input_components": [
-    {
-      "name": "Vietnamese Telex",
-      "type": "ime",
-      "id": "telex",
-      "description": "Vietnamese Telex input method",
-      "language": "vi",
-      "layouts": ["us"]
-    }
-  ],
 
   "background": {
     "service_worker": "background.js",
