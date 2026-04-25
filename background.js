@@ -18,19 +18,40 @@ chrome.input.ime.onBlur.addListener(() => {
 // KEY EVENT (PASS THROUGH)
 // =====================
 chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
-  if (keyData.type !== "keydown" || contextID === -1) {
-    return false;
+  if (keyData.type !== "keydown" || contextID === -1) return false;
+
+  // bỏ Ctrl/Alt/Meta
+  if (keyData.ctrlKey || keyData.altKey || keyData.metaKey) return false;
+
+  // =====================
+  // BACKSPACE
+  // =====================
+  if (keyData.key === "Backspace") {
+    chrome.input.ime.sendKeyEvents({
+      contextID,
+      keyData: [keyData]
+    });
+    return true;
   }
 
-  // bỏ phím hệ thống
-  if (keyData.ctrlKey || keyData.altKey || keyData.metaKey) {
-    return false;
+  // =====================
+  // ENTER / SPACE / NORMAL KEYS
+  // =====================
+  if (keyData.key && keyData.key.length === 1) {
+    chrome.input.ime.sendKeyEvents({
+      contextID,
+      keyData: [keyData]
+    });
+    return true;
   }
 
-  // ❌ KHÔNG xử lý gì cả
-  // ❌ KHÔNG buffer
-  // ❌ KHÔNG composition
-  // ❌ KHÔNG commit
+  if (keyData.key === "Enter" || keyData.key === " ") {
+    chrome.input.ime.sendKeyEvents({
+      contextID,
+      keyData: [keyData]
+    });
+    return true;
+  }
 
-  return false; // 👉 trả lại Chrome xử lý bình thường
+  return false;
 });
