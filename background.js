@@ -32,31 +32,56 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
   // =====================
   if (keyData.key === "Backspace") {
     IMEBuffer.deleteBackward();
+    updateComposition();
+    return true;
+  }
 
-    chrome.input.ime.setComposition({
-      contextID,
-      text: IMEBuffer.text,
-      cursor: IMEBuffer.cursor
-    });
-
+  // =====================
+  // SPACE → COMMIT WORD
+  // =====================
+  if (keyData.key === " ") {
+    commitWord();
     return true;
   }
 
   // =====================
   // CHARACTER INPUT
   // =====================
-  if (keyData.code.startsWith("Key")) {
+  if (keyData.key && keyData.key.length === 1) {
     IMEBuffer.insert(keyData.key);
-
-    // 🔥 HIỂN THỊ CHỮ ĐANG GÕ (BUFFER)
-    chrome.input.ime.setComposition({
-      contextID,
-      text: IMEBuffer.text,
-      cursor: IMEBuffer.cursor
-    });
-
+    updateComposition();
     return true;
   }
 
   return false;
 });
+
+// =====================
+// COMPOSITION UPDATE
+// =====================
+function updateComposition() {
+  chrome.input.ime.setComposition({
+    contextID,
+    text: IMEBuffer.text,
+    cursor: IMEBuffer.cursor
+  });
+}
+
+// =====================
+// COMMIT WORD
+// =====================
+function commitWord() {
+  chrome.input.ime.commitText({
+    contextID,
+    text: IMEBuffer.text
+  });
+
+  IMEBuffer.text = "";
+  IMEBuffer.cursor = 0;
+
+  chrome.input.ime.setComposition({
+    contextID,
+    text: "",
+    cursor: 0
+  });
+}
