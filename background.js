@@ -1,16 +1,14 @@
-import { IMEBuffer } from "./src/core/ime_buffer.js";
 import { CursorManager } from "./src/core/cursor_manager.js";
 
 let contextID = -1;
+let lastWord = "";
 
 // =====================
 // FOCUS
 // =====================
 chrome.input.ime.onFocus.addListener((context) => {
   contextID = context.contextID;
-
-  IMEBuffer.text = "";
-  IMEBuffer.cursor = 0;
+  lastWord = "";
 });
 
 // =====================
@@ -18,10 +16,11 @@ chrome.input.ime.onFocus.addListener((context) => {
 // =====================
 chrome.input.ime.onBlur.addListener(() => {
   contextID = -1;
+  lastWord = "";
 });
 
 // =====================
-// KEY EVENT CORE
+// KEY EVENT
 // =====================
 chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
   if (keyData.type !== "keydown" || contextID === -1) return false;
@@ -32,33 +31,24 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
   // BACKSPACE
   // =====================
   if (keyData.key === "Backspace") {
-    IMEBuffer.deleteBackward();
-
-    chrome.input.ime.commitText({
-      contextID,
-      text: ""
-    });
-
-    return true;
+    return false; // để Chrome xử lý
   }
 
   // =====================
   // CHARACTER INPUT
   // =====================
   if (keyData.code.startsWith("Key")) {
-    IMEBuffer.insert(keyData.key);
 
-    const word = CursorManager.getWord(
-      IMEBuffer.text,
-      IMEBuffer.cursor
-    );
+    const char = keyData.key;
 
-    console.log("WORD:", word);
+    lastWord += char;
 
-    // 🔥 QUAN TRỌNG NHẤT: gửi ra UI
+    console.log("WORD:", lastWord);
+
+    // ⚠️ CHỈ commit CHAR, KHÔNG dùng buffer replace
     chrome.input.ime.commitText({
       contextID,
-      text: keyData.key
+      text: char
     });
 
     return true;
