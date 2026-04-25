@@ -1,4 +1,4 @@
-import { CursorManager } from './src/core/cursor_manager';
+import { CursorManager } from './src/core/cursor_manager.js';
 
 let contextID = -1;
 
