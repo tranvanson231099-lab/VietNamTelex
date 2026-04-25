@@ -1,10 +1,11 @@
+// ime_buffer.js
 export const IMEBuffer = {
   text: "",
   cursor: 0,
 
   set(text, cursor) {
     this.text = text || "";
-    this.cursor = cursor || 0;
+    this.cursor = cursor ?? 0;
   },
 
   reset() {
@@ -13,10 +14,11 @@ export const IMEBuffer = {
   },
 
   insert(char) {
-    const before = this.text.slice(0, this.cursor);
-    const after = this.text.slice(this.cursor);
+    this.text =
+      this.text.slice(0, this.cursor) +
+      char +
+      this.text.slice(this.cursor);
 
-    this.text = before + char + after;
     this.cursor += char.length;
   },
 

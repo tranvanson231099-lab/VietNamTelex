@@ -1,3 +1,4 @@
+// cursor_manager.js
 export const CursorManager = {
   isLetter(ch) {
     return ch && /[\p{L}\p{M}]/u.test(ch.normalize("NFC"));

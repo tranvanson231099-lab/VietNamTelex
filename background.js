@@ -2,7 +2,6 @@ import { IMEBuffer } from "./src/core/ime_buffer.js";
 import { CursorManager } from "./src/core/cursor_manager.js";
 
 let contextID = -1;
-let inputLock = false;
 
 // =====================
 // FOCUS
@@ -21,7 +20,7 @@ chrome.input.ime.onBlur.addListener(() => {
 });
 
 // =====================
-// SYNC FROM CHROME (VERY IMPORTANT)
+// SYNC FROM CHROME (QUAN TRỌNG NHẤT)
 // =====================
 chrome.input.ime.onSurroundingTextChanged.addListener((engineID, info) => {
   if (!info) return;
@@ -30,72 +29,7 @@ chrome.input.ime.onSurroundingTextChanged.addListener((engineID, info) => {
 });
 
 // =====================
-// SAFE WRAPPER (ANTI DOUBLE INPUT)
-// =====================
-function safe(fn) {
-  if (inputLock) return;
-
-  inputLock = true;
-  fn();
-
-  setTimeout(() => {
-    inputLock = false;
-  }, 0);
-}
-
-// =====================
-// KEY EVENT
-// =====================
-chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
-  if (keyData.type !== "keydown" || contextID === -1) return false;
-
-  if (keyData.ctrlKey || keyData.altKey || keyData.metaKey) return false;
-
-  // =====================
-  // BACKSPACE
-  // =====================
-  if (keyData.key === "Backspace") {
-    safe(() => {
-      IMEBuffer.deleteBackward();
-      render();
-    });
-
-    return true;
-  }
-
-  // =====================
-  // SPACE
-  // =====================
-  if (keyData.key === " ") {
-    commit(" ");
-    return true;
-  }
-
-  // =====================
-  // ENTER
-  // =====================
-  if (keyData.key === "Enter") {
-    commit("\n");
-    return true;
-  }
-
-  // =====================
-  // CHAR INPUT
-  // =====================
-  if (keyData.key && keyData.key.length === 1) {
-    safe(() => {
-      IMEBuffer.insert(keyData.key);
-      render();
-    });
-
-    return true; // 🔥 IMPORTANT: BLOCK CHROME INPUT
-  }
-
-  return false;
-});
-
-// =====================
-// RENDER COMPOSITION
+// RENDER COMPOSITION (REALTIME FIX)
 // =====================
 function render() {
   if (contextID === -1) return;
@@ -105,11 +39,9 @@ function render() {
     IMEBuffer.cursor
   );
 
-  console.log("==============");
   console.log("TEXT:", IMEBuffer.text);
   console.log("CURSOR:", IMEBuffer.cursor);
   console.log("WORD:", word);
-  console.log("==============");
 
   chrome.input.ime.setComposition({
     contextID,
@@ -137,3 +69,48 @@ function commit(extra = "") {
     cursor: 0
   });
 }
+
+// =====================
+// KEY EVENT
+// =====================
+chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
+  if (keyData.type !== "keydown" || contextID === -1) return false;
+
+  if (keyData.ctrlKey || keyData.altKey || keyData.metaKey) return false;
+
+  // =====================
+  // BACKSPACE
+  // =====================
+  if (keyData.key === "Backspace") {
+    IMEBuffer.deleteBackward();
+    render();
+    return true;
+  }
+
+  // =====================
+  // SPACE
+  // =====================
+  if (keyData.key === " ") {
+    commit(" ");
+    return true;
+  }
+
+  // =====================
+  // ENTER
+  // =====================
+  if (keyData.key === "Enter") {
+    commit("\n");
+    return true;
+  }
+
+  // =====================
+  // NORMAL CHAR
+  // =====================
+  if (keyData.key && keyData.key.length === 1) {
+    IMEBuffer.insert(keyData.key);
+    render();
+    return true; // IMPORTANT: BLOCK SYSTEM INPUT
+  }
+
+  return false;
+});
