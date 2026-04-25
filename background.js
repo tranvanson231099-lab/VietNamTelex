@@ -20,7 +20,7 @@ chrome.input.ime.onBlur.addListener(() => {
 });
 
 // =====================
-// SYNC FROM CHROME (QUAN TRỌNG NHẤT)
+// SYNC FROM CHROME TEXT
 // =====================
 chrome.input.ime.onSurroundingTextChanged.addListener((engineID, info) => {
   if (!info) return;
@@ -29,7 +29,7 @@ chrome.input.ime.onSurroundingTextChanged.addListener((engineID, info) => {
 });
 
 // =====================
-// RENDER COMPOSITION (REALTIME FIX)
+// RENDER COMPOSITION
 // =====================
 function render() {
   if (contextID === -1) return;
