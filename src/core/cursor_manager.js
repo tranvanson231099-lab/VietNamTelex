@@ -16,7 +16,7 @@ export const CursorManager = {
       this.info.textAfter = info.text.slice(info.focus);
     },
   
-    // ⚡ FULL WORD theo cursor (chuẩn bạn yêu cầu)
+    // 🔥 FULL WORD (tích hợp từ hàm bạn đưa)
     getFullWord() {
       const text = this.info.text;
       const cursor = this.info.focus;
@@ -26,7 +26,7 @@ export const CursorManager = {
       const isLetter = (ch) =>
         /[a-zA-ZăâêôơưđĂÂÊÔƠƯĐ]/.test(ch);
   
-      // Nếu ký tự bên trái không phải chữ → chưa vào từ
+      // Nếu ký tự trước cursor không phải chữ
       if (!isLetter(text[cursor - 1])) {
         return "";
       }
@@ -34,12 +34,12 @@ export const CursorManager = {
       let start = cursor;
       let end = cursor;
   
-      // ⬅️ tìm đầu từ
+      // ⬅️ tìm start
       while (start > 0 && isLetter(text[start - 1])) {
         start--;
       }
   
-      // ➡️ tìm cuối từ
+      // ➡️ tìm end
       while (end < text.length && isLetter(text[end])) {
         end++;
       }
@@ -47,7 +47,7 @@ export const CursorManager = {
       return text.slice(start, end);
     },
   
-    // ⚡ Lấy vị trí bắt đầu của full word
+    // 🔥 Range của full word (để replace / bôi đen)
     getFullWordRange() {
       const text = this.info.text;
       const cursor = this.info.focus;
@@ -73,7 +73,7 @@ export const CursorManager = {
       return { start, end };
     },
   
-    // ❗ giữ lại nếu bạn vẫn cần (word bên trái)
+    // (giữ lại nếu cần)
     getCurrentWord() {
       const words = this.info.textBefore.split(/\s+/);
       return words.length ? words[words.length - 1] : "";
