@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "My Custom IME",
+  "version": "1.0",
+  "description": "Bộ gõ tùy chỉnh cho ChromeOS",
+  "permissions": [
+    "input"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "input_components": [
+    {
+      "name": "Tiếng Việt",
+      "id": "my_custom_ime",
+      "language": "vi",
+      "layouts": ["us"],
+      "type": "ime"
+    }
+  ]
+}
