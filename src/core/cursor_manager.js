@@ -1,5 +1,3 @@
-// cursor_manager.js
-
 export const CursorManager = {
     info: {
       text: "",
@@ -9,29 +7,30 @@ export const CursorManager = {
       textAfter: ""
     },
   
-    // Cập nhật dữ liệu từ hệ thống
-    update(surroundingInfo) {
-      this.info.text = surroundingInfo.text;
-      this.info.focus = surroundingInfo.focus;
-      this.info.anchor = surroundingInfo.anchor;
-      
-      // Tách văn bản tại vị trí con trỏ
-      this.info.textBefore = surroundingInfo.text.slice(0, surroundingInfo.focus);
-      this.info.textAfter = surroundingInfo.text.slice(cursorInfo.focus);
+    update(info) {
+      this.info.text = info.text;
+      this.info.focus = info.focus;
+      this.info.anchor = info.anchor;
+  
+      this.info.textBefore = info.text.slice(0, info.focus);
+      this.info.textAfter = info.text.slice(info.focus);
     },
   
-    // Lấy từ hiện tại đang gõ (ví dụ: "xin cha" -> "cha")
     getCurrentWord() {
       const words = this.info.textBefore.split(/\s+/);
-      return words.length > 0 ? words[words.length - 1] : "";
+      return words.length ? words[words.length - 1] : "";
     },
   
-    // Kiểm tra xem người dùng có đang bôi đen (select) văn bản không
+    getWordStartIndex() {
+      const before = this.info.textBefore;
+      const lastSpace = before.lastIndexOf(" ");
+      return lastSpace === -1 ? 0 : lastSpace + 1;
+    },
+  
     hasSelection() {
       return this.info.focus !== this.info.anchor;
     },
   
-    // Lấy tọa độ tương đối (nếu cần xử lý nâng cao)
     getCursorIndex() {
       return this.info.focus;
     }
