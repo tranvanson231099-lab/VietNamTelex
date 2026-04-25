@@ -1,6 +1,5 @@
-import { IMEBuffer } from "./ime_buffer.js";
-import { CursorManager } from "./cursor_manager.js";
-import { applyVietnameseTone } from "./telex_engine.js";
+import { IMEBuffer } from "./src/core/ime_buffer.js";
+import { CursorManager } from "./src/core/cursor_manager.js";
 
 let contextID = -1;
 
