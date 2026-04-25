@@ -2,6 +2,7 @@ import { IMEBuffer } from "./src/core/ime_buffer.js";
 import { CursorManager } from "./src/core/cursor_manager.js";
 
 let contextID = -1;
+let inputLock = false;
 
 // =====================
 // FOCUS
@@ -20,13 +21,27 @@ chrome.input.ime.onBlur.addListener(() => {
 });
 
 // =====================
-// SYNC REAL CURSOR FROM CHROME
+// SYNC FROM CHROME (VERY IMPORTANT)
 // =====================
 chrome.input.ime.onSurroundingTextChanged.addListener((engineID, info) => {
   if (!info) return;
 
   IMEBuffer.set(info.text, info.focus);
 });
+
+// =====================
+// SAFE WRAPPER (ANTI DOUBLE INPUT)
+// =====================
+function safe(fn) {
+  if (inputLock) return;
+
+  inputLock = true;
+  fn();
+
+  setTimeout(() => {
+    inputLock = false;
+  }, 0);
+}
 
 // =====================
 // KEY EVENT
@@ -36,30 +51,44 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
 
   if (keyData.ctrlKey || keyData.altKey || keyData.metaKey) return false;
 
+  // =====================
   // BACKSPACE
+  // =====================
   if (keyData.key === "Backspace") {
-    IMEBuffer.deleteBackward();
-    render();
+    safe(() => {
+      IMEBuffer.deleteBackward();
+      render();
+    });
+
     return true;
   }
 
+  // =====================
   // SPACE
+  // =====================
   if (keyData.key === " ") {
-    commitWord(" ");
+    commit(" ");
     return true;
   }
 
+  // =====================
   // ENTER
+  // =====================
   if (keyData.key === "Enter") {
-    commitWord("\n");
+    commit("\n");
     return true;
   }
 
-  // NORMAL CHAR
+  // =====================
+  // CHAR INPUT
+  // =====================
   if (keyData.key && keyData.key.length === 1) {
-    IMEBuffer.insert(keyData.key);
-    render();
-    return true;
+    safe(() => {
+      IMEBuffer.insert(keyData.key);
+      render();
+    });
+
+    return true; // 🔥 IMPORTANT: BLOCK CHROME INPUT
   }
 
   return false;
@@ -71,7 +100,10 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
 function render() {
   if (contextID === -1) return;
 
-  const word = CursorManager.getWordFromBuffer(IMEBuffer);
+  const word = CursorManager.getWord(
+    IMEBuffer.text,
+    IMEBuffer.cursor
+  );
 
   console.log("==============");
   console.log("TEXT:", IMEBuffer.text);
@@ -89,7 +121,7 @@ function render() {
 // =====================
 // COMMIT
 // =====================
-function commitWord(extra = "") {
+function commit(extra = "") {
   if (contextID === -1) return;
 
   chrome.input.ime.commitText({

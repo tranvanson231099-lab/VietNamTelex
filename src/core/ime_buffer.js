@@ -7,6 +7,11 @@ export const IMEBuffer = {
     this.cursor = cursor || 0;
   },
 
+  reset() {
+    this.text = "";
+    this.cursor = 0;
+  },
+
   insert(char) {
     const before = this.text.slice(0, this.cursor);
     const after = this.text.slice(this.cursor);
@@ -23,10 +28,5 @@ export const IMEBuffer = {
       this.text.slice(this.cursor);
 
     this.cursor--;
-  },
-
-  reset() {
-    this.text = "";
-    this.cursor = 0;
   }
 };
