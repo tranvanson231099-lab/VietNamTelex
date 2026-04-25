@@ -1,20 +1,44 @@
 export const CursorManager = {
+    isLetter(ch) {
+      return ch && /[\p{L}\p{M}]/u.test(ch.normalize("NFC"));
+    },
+  
     getWord(text, cursor) {
       if (!text) return "";
   
-      const isLetter = (ch) =>
-        ch && /[\p{L}\p{M}]/u.test(ch.normalize("NFC"));
-  
-      let start = cursor - 1;
+      let start = cursor;
       let end = cursor;
   
-      if (start < 0 || !isLetter(text[start])) return "";
+      // =====================
+      // 1. tìm start (lùi trái)
+      // =====================
+      while (start > 0 && this.isLetter(text[start - 1])) {
+        start--;
+      }
   
-      while (start >= 0 && isLetter(text[start])) start--;
-      start++;
+      // =====================
+      // 2. tìm end (tới phải)
+      // =====================
+      while (end < text.length && this.isLetter(text[end])) {
+        end++;
+      }
   
+      const word = text.slice(start, end);
+  
+      return word;
+    },
+  
+    getRange(text, cursor) {
+      if (!text) return { start: cursor, end: cursor };
+  
+      const isLetter = this.isLetter;
+  
+      let start = cursor;
+      let end = cursor;
+  
+      while (start > 0 && isLetter(text[start - 1])) start--;
       while (end < text.length && isLetter(text[end])) end++;
   
-      return text.slice(start, end);
+      return { start, end };
     }
   };

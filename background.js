@@ -10,8 +10,6 @@ chrome.input.ime.onFocus.addListener((context) => {
 
   IMEBuffer.text = "";
   IMEBuffer.cursor = 0;
-
-  console.log("IME Focus:", contextID);
 });
 
 // =====================
@@ -39,18 +37,18 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
   }
 
   // =====================
-  // SPACE → COMMIT
+  // SPACE → COMMIT WORD
   // =====================
   if (keyData.key === " ") {
-    chrome.input.ime.commitText({
-      contextID,
-      text: IMEBuffer.text + " "
-    });
+    commitWord(" ");
+    return true;
+  }
 
-    IMEBuffer.text = "";
-    IMEBuffer.cursor = 0;
-
-    clearComposition();
+  // =====================
+  // ENTER → COMMIT WORD
+  // =====================
+  if (keyData.key === "Enter") {
+    commitWord("\n");
     return true;
   }
 
@@ -67,14 +65,16 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
 });
 
 // =====================
-// RENDER COMPOSITION (IMPORTANT FIX)
+// RENDER COMPOSITION (FIXED)
 // =====================
 function render() {
   if (contextID === -1) return;
 
+  const text = IMEBuffer.text;
+
   chrome.input.ime.setComposition({
     contextID,
-    text: IMEBuffer.text || " ",
+    text: text,
     cursor: IMEBuffer.cursor
   }, () => {
     if (chrome.runtime.lastError) {
@@ -84,9 +84,21 @@ function render() {
 }
 
 // =====================
-// CLEAR
+// COMMIT WORD (FIXED)
 // =====================
-function clearComposition() {
+function commitWord(extra = "") {
+  if (contextID === -1) return;
+
+  const finalText = IMEBuffer.text + extra;
+
+  chrome.input.ime.commitText({
+    contextID,
+    text: finalText
+  });
+
+  IMEBuffer.text = "";
+  IMEBuffer.cursor = 0;
+
   chrome.input.ime.setComposition({
     contextID,
     text: "",
