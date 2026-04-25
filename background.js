@@ -10,6 +10,8 @@ chrome.input.ime.onFocus.addListener((context) => {
 
   IMEBuffer.text = "";
   IMEBuffer.cursor = 0;
+
+  console.log("IME Focus:", contextID);
 });
 
 // =====================
@@ -32,24 +34,32 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
   // =====================
   if (keyData.key === "Backspace") {
     IMEBuffer.deleteBackward();
-    updateComposition();
+    render();
     return true;
   }
 
   // =====================
-  // SPACE → COMMIT WORD
+  // SPACE → COMMIT
   // =====================
   if (keyData.key === " ") {
-    commitWord();
+    chrome.input.ime.commitText({
+      contextID,
+      text: IMEBuffer.text + " "
+    });
+
+    IMEBuffer.text = "";
+    IMEBuffer.cursor = 0;
+
+    clearComposition();
     return true;
   }
 
   // =====================
-  // CHARACTER INPUT
+  // NORMAL CHAR
   // =====================
   if (keyData.key && keyData.key.length === 1) {
     IMEBuffer.insert(keyData.key);
-    updateComposition();
+    render();
     return true;
   }
 
@@ -57,28 +67,26 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
 });
 
 // =====================
-// COMPOSITION UPDATE
+// RENDER COMPOSITION (IMPORTANT FIX)
 // =====================
-function updateComposition() {
+function render() {
+  if (contextID === -1) return;
+
   chrome.input.ime.setComposition({
     contextID,
-    text: IMEBuffer.text,
+    text: IMEBuffer.text || " ",
     cursor: IMEBuffer.cursor
+  }, () => {
+    if (chrome.runtime.lastError) {
+      console.warn("Composition error:", chrome.runtime.lastError.message);
+    }
   });
 }
 
 // =====================
-// COMMIT WORD
+// CLEAR
 // =====================
-function commitWord() {
-  chrome.input.ime.commitText({
-    contextID,
-    text: IMEBuffer.text
-  });
-
-  IMEBuffer.text = "";
-  IMEBuffer.cursor = 0;
-
+function clearComposition() {
   chrome.input.ime.setComposition({
     contextID,
     text: "",
