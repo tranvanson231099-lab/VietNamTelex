@@ -5,8 +5,7 @@
   "description": "Tools for Vietnamese language.",
   "author": "Sơn",
   "permissions": [
-    "input",
-    "input.editing"
+    "input"
   ],
   "input_components": [
     {
