@@ -1,5 +1,5 @@
 const imeEngine = {
-    engineID: "my_custom_ime",
+    engineID: "telex",
     contextId: -1, 
     menuItems: [
         { id: "about", label: "About this IME" }

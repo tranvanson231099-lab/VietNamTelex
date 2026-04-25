@@ -1,21 +1,23 @@
 {
-  "manifest_version": 3,
-  "name": "My Custom IME",
+  "name": "Vietnamese Tools",
   "version": "1.0",
-  "description": "Bộ gõ tùy chỉnh cho ChromeOS",
+  "manifest_version": 3,
+  "description": "Tools for Vietnamese language.",
+  "author": "Sơn",
   "permissions": [
     "input"
   ],
-  "background": {
-    "service_worker": "background.js"
-  },
   "input_components": [
     {
-      "name": "Tiếng Việt",
-      "id": "my_custom_ime",
+      "name": "Vietnamese Telex",
+      "type": "ime",
+      "id": "telex",
+      "description": "Vietnamese Telex input method",
       "language": "vi",
-      "layouts": ["us"],
-      "type": "ime"
+      "layouts": ["us"]
     }
-  ]
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
 }
