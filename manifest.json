@@ -1,10 +1,25 @@
 {
   "manifest_version": 3,
-  "name": "Vietnamese Tools",
+  "name": "Vietnamese Keyboard IME",
   "version": "1.0",
-  "description": "Clean keyboard extension",
+  "description": "Bàn phím tiếng Việt kiểu Telex",
+
+  "permissions": [
+    "input"
+  ],
 
   "background": {
     "service_worker": "background.js"
-  }
+  },
+
+  "input_components": [
+    {
+      "name": "Vietnamese Telex",
+      "type": "ime",
+      "id": "vietnamese_telex",
+      "description": "Bộ gõ tiếng Việt Telex",
+      "language": "vi",
+      "layouts": ["us"]
+    }
+  ]
 }

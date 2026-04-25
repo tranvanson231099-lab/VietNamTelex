@@ -1,36 +1,29 @@
 let contextID = -1;
 
-// =====================
-// FOCUS
-// =====================
+// Khi focus vào ô nhập
 chrome.input.ime.onFocus.addListener((context) => {
   contextID = context.contextID;
 });
 
-// =====================
-// BLUR
-// =====================
+// Khi blur
 chrome.input.ime.onBlur.addListener(() => {
   contextID = -1;
 });
 
-// =====================
-// KEY EVENT (RAW PASS THROUGH)
-// =====================
+// Xử lý phím
 chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
-  if (keyData.type !== "keydown" || contextID === -1) {
-    return false;
-  }
+  if (keyData.type !== "keydown") return false;
 
-  // bỏ Ctrl / Alt / Meta
-  if (keyData.ctrlKey || keyData.altKey || keyData.metaKey) {
-    return false;
-  }
+  // chỉ xử lý khi đang focus input
+  if (contextID === -1) return false;
 
-  // forward toàn bộ phím về Chrome
-  chrome.input.ime.sendKeyEvents({
+  // bỏ qua phím đặc biệt (Shift, Ctrl, Alt,...)
+  if (keyData.key.length !== 1) return false;
+
+  // commit ngay ký tự
+  chrome.input.ime.commitText({
     contextID,
-    keyData: [keyData]
+    text: keyData.key
   });
 
   return true;
