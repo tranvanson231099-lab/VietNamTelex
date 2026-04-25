@@ -1,52 +1,37 @@
-const imeEngine = {
-    engineID: "telex",
-    contextId: -1, 
-    menuItems: [
-        { id: "about", label: "About this IME" }
-    ],
+let contextID = -1;
 
-    onActivate: (engineID) => {
-        console.log("onActivate", engineID);
-    },
+// Gán ID khi ô nhập liệu được chọn
+chrome.input.ime.onFocus.addListener((context) => {
+  contextID = context.contextID;
+});
 
-    onDeactivated: (engineID) => {
-        console.log("onDeactivated", engineID);
-    },
+// Reset khi thoát ô nhập liệu
+chrome.input.ime.onBlur.addListener(() => {
+  contextID = -1;
+});
 
-    onFocus: (context) => {
-        console.log("onFocus", context.contextID);
-        imeEngine.contextId = context.contextID;
-    },
+// Xử lý sự kiện bàn phím
+chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
+  // Chỉ xử lý khi nhấn phím xuống (keydown)
+  if (keyData.type !== "keydown") return false;
 
-    onBlur: (contextID) => {
-        console.log("onBlur", contextID);
-        if (imeEngine.contextId === contextID) {
-            imeEngine.contextId = -1;
-        }
-    },
+  // Bỏ qua nếu đang nhấn tổ hợp phím chức năng (Ctrl, Alt, Meta)
+  if (keyData.ctrlKey || keyData.altKey || keyData.metaKey) return false;
 
-    onKeyEvent: (engineID, keyData, requestId) => {
-        console.log("onKeyEvent", keyData);
-        if (keyData.type === "keydown" && imeEngine.contextId !== -1) {
-            if (keyData.key.length === 1) {
-                chrome.input.ime.commitText({
-                    contextID: imeEngine.contextId,
-                    text: keyData.key
-                });
-                return true;
-            }
-        }
-        return false;
-    },
+  /**
+   * KIỂM TRA PHÍM CHỮ (a-z):
+   * keyData.code của các phím chữ luôn có định dạng "KeyA", "KeyB",... "KeyZ"
+   * Cách này loại bỏ mọi phím hệ thống (Space, Enter, Backspace) mà không cần lập danh sách.
+   */
+  if (keyData.code.startsWith("Key")) {
+    chrome.input.ime.commitText({
+      contextID: contextID,
+      text: keyData.key
+    });
 
-    onMenuItemClicked: (engineID, name) => {
-        console.log("onMenuItemClicked", engineID, name);
-    }
-}
+    return true; // Đã xử lý, chặn trình duyệt tự gõ ký tự gốc
+  }
 
-chrome.input.ime.onActivate.addListener(imeEngine.onActivate);
-chrome.input.ime.onDeactivated.addListener(imeEngine.onDeactivated);
-chrome.input.ime.onFocus.addListener(imeEngine.onFocus);
-chrome.input.ime.onBlur.addListener(imeEngine.onBlur);
-chrome.input.ime.onKeyEvent.addListener(imeEngine.onKeyEvent);
-chrome.input.ime.onMenuItemClicked.addListener(imeEngine.onMenuItemClicked);
+  // Mọi phím khác (số, ký tự đặc biệt, phím điều hướng) -> Để hệ thống tự xử lý
+  return false;
+});
