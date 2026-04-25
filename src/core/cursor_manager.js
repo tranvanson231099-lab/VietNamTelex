@@ -16,15 +16,17 @@ export const CursorManager = {
       this.info.textAfter = this.info.text.slice(this.info.focus);
     },
   
-    // ✅ lấy full word
+    // =========================
+    // 🔥 UNICODE WORD DETECTOR
+    // =========================
     getFullWord() {
       const text = this.info.text;
       const cursor = this.info.focus;
   
-      if (!text || cursor === 0) return "";
+      if (!text || cursor <= 0) return "";
   
       const isLetter = (ch) =>
-        /[a-zA-ZăâêôơưđĂÂÊÔƠƯĐ]/.test(ch);
+        ch && /[\p{L}\p{M}]/u.test(ch.normalize("NFC"));
   
       if (!isLetter(text[cursor - 1])) return "";
   
@@ -37,15 +39,17 @@ export const CursorManager = {
       return text.slice(start, end);
     },
   
-    // ✅ range word (QUAN TRỌNG CHO IME)
+    // =========================
+    // 🔥 RANGE FOR IME REPLACE
+    // =========================
     getFullWordRange() {
       const text = this.info.text;
       const cursor = this.info.focus;
   
       const isLetter = (ch) =>
-        /[a-zA-ZăâêôơưđĂÂÊÔƠƯĐ]/.test(ch);
+        ch && /[\p{L}\p{M}]/u.test(ch.normalize("NFC"));
   
-      if (!text || cursor === 0 || !isLetter(text[cursor - 1])) {
+      if (!text || cursor <= 0 || !isLetter(text[cursor - 1])) {
         return { start: cursor, end: cursor };
       }
   
