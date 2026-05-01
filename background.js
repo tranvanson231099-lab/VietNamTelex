@@ -32,13 +32,7 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
       if (buffer.length === 0) {
         chrome.input.ime.clearComposition({ contextID });
       } else {
-        chrome.input.ime.setComposition({
-          contextID,
-          text: buffer,
-          cursor: buffer.length,
-          selectionStart: 0,
-          selectionEnd: buffer.length
-        });
+        updateComposition();
       }
       return true;
     }
@@ -59,8 +53,6 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
       buffer = "";
       return true;
     }
-
-    // nếu không có buffer thì cho space bình thường
     return false;
   }
 
@@ -91,16 +83,31 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
   // =====================
   buffer += key;
 
-  // =====================
-  // HIỂN THỊ + BÔI ĐEN TỪ ĐANG GÕ
-  // =====================
-  chrome.input.ime.setComposition({
-    contextID,
-    text: buffer,
-    cursor: buffer.length,          // 🔥 bắt buộc (fix lỗi của bạn)
-    selectionStart: 0,              // bôi từ đầu
-    selectionEnd: buffer.length     // đến cuối → bôi đen cả từ
-  });
+  updateComposition();
 
   return true;
 });
+
+// =====================
+// UPDATE COMPOSITION
+// =====================
+function updateComposition() {
+  chrome.input.ime.setComposition({
+    contextID,
+    text: buffer,
+    cursor: buffer.length,
+
+    // 👉 KHÔNG bôi đen (UX giống Laban)
+    selectionStart: buffer.length,
+    selectionEnd: buffer.length,
+
+    // 👉 cố gắng ẩn gạch dưới
+    segments: [
+      {
+        start: 0,
+        end: buffer.length,
+        style: "none"
+      }
+    ]
+  });
+}
