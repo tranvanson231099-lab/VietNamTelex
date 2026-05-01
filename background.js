@@ -1,29 +1,44 @@
 let contextID = -1;
+let buffer = "";
 
-// Khi focus vào ô nhập
 chrome.input.ime.onFocus.addListener((context) => {
   contextID = context.contextID;
 });
 
-// Khi blur
 chrome.input.ime.onBlur.addListener(() => {
   contextID = -1;
+  buffer = "";
 });
 
-// Xử lý phím
 chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
   if (keyData.type !== "keydown") return false;
-
-  // chỉ xử lý khi đang focus input
   if (contextID === -1) return false;
 
-  // bỏ qua phím đặc biệt (Shift, Ctrl, Alt,...)
-  if (keyData.key.length !== 1) return false;
+  const key = keyData.key;
 
-  // commit ngay ký tự
-  chrome.input.ime.commitText({
+  // SPACE = commit từ
+  if (key === " ") {
+    chrome.input.ime.commitText({
+      contextID,
+      text: buffer + " "
+    });
+
+    chrome.input.ime.clearComposition({ contextID });
+    buffer = "";
+    return true;
+  }
+
+  // chỉ nhận ký tự thường
+  if (key.length !== 1) return false;
+
+  buffer += key;
+
+  // 🔥 chỉ bôi đen từ đang gõ
+  chrome.input.ime.setComposition({
     contextID,
-    text: keyData.key
+    text: buffer,
+    selectionStart: 0,
+    selectionEnd: buffer.length
   });
 
   return true;
