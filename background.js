@@ -107,7 +107,7 @@ function render() {
     cursor: cursorPos,
     selectionStart: cursorPos,
     selectionEnd: cursorPos,
-    segments: [{ start: 0, end: text.length, style: "none" }]
+    segments: [{ start: 0, end: text.length, style: "noUnderline" }]
   });
 }
 
