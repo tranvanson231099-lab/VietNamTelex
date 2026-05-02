@@ -1,4 +1,6 @@
-importScripts('telex_engine.js');
+importScripts('core/composer.js');
+
+const composer = new Composer();
 
 let contextID = -1;
 
@@ -72,7 +74,7 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
   // =====================
   if (key === "Enter") {
     if (rawBuffer.length > 0) {
-      const { text } = transformFull(rawBuffer, cursor);
+      const { text } = composer.transform(rawBuffer, cursor);
 
       chrome.input.ime.commitText({
         contextID,
@@ -93,7 +95,7 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
   // =====================
   if (key === " ") {
     if (rawBuffer.length > 0) {
-      const { text } = transformFull(rawBuffer, cursor);
+      const { text } = composer.transform(rawBuffer, cursor);
 
       chrome.input.ime.commitText({
         contextID,
@@ -135,7 +137,7 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
 // RENDER
 // =====================
 function render() {
-  const { text, cursorPos } = transformFull(rawBuffer, cursor);
+  const { text, cursorPos } = composer.transform(rawBuffer, cursor);
 
   chrome.input.ime.setComposition({
     contextID,
