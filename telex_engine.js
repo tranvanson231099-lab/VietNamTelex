@@ -210,7 +210,7 @@ class TelexEngine {
 
     return {
       text: result.normalize("NFC"),
-      cursor: cursorPos
+      cursorPos: cursorPos
     };
   }
 }
