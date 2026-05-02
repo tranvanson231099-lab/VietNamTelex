@@ -20,6 +20,50 @@ const TONE_MAP = {
   j: "\u0323"
 };
 
+const VOWEL_TABLE = {
+  a: "aàáảãạ",
+  ă: "ăằắẳẵặ",
+  â: "âầấẩẫậ",
+  e: "eèéẻẽẹ",
+  ê: "êềếểễệ",
+  i: "iìíỉĩị",
+  o: "oòóỏõọ",
+  ô: "ôồốổỗộ",
+  ơ: "ơờớởỡợ",
+  u: "uùúủũụ",
+  ư: "ưừứửữự",
+  y: "yỳýỷỹỵ"
+};
+
+// =====================
+// HELPERS
+// =====================
+function removeToneChar(c) {
+  for (let key in VOWEL_TABLE) {
+    if (VOWEL_TABLE[key].includes(c)) return key;
+  }
+  return c;
+}
+
+function addTone(char, toneKey) {
+  const base = removeToneChar(char);
+  const toneIndex = ["", "f", "s", "r", "x", "j"].indexOf(toneKey);
+  if (toneIndex === -1) return char;
+  const toneName = ["ngang", "huyền", "sắc", "hỏi", "ngã", "nặng"];
+  const tone = toneName[toneIndex];
+
+  for (let key in VOWEL_TABLE) {
+    if (key === base) {
+        const index = {
+            "ngang": 0, "huyền": 1, "sắc": 2, "hỏi": 3, "ngã": 4, "nặng": 5
+        }[tone];
+        return VOWEL_TABLE[key][index] || key;
+    }
+  }
+  return char;
+}
+
+
 // =====================
 // WORD STATE
 // =====================
@@ -28,12 +72,14 @@ class WordState {
     this.raw = raw;
     this.chars = [];
     this.tone = null;
+    this.hasTelex = false;
     this.build();
   }
 
   build() {
     this.chars = [];
     this.tone = null;
+    this.hasTelex = false;
 
     for (let k of this.raw) {
       this._input(k);
@@ -41,38 +87,30 @@ class WordState {
   }
 
   _input(k) {
-    // ===== tone key
     if (TONE_KEYS.includes(k)) {
-      this.tone = k; // overwrite → bỏ dấu tự do
+      this.tone = k;
+      this.hasTelex = true;
       return;
     }
 
-    const last = this.chars[this.chars.length - 1] || "";
+    const last = this.chars.length > 0 ? this.chars[this.chars.length - 1] : "";
     const pair = last + k;
 
-    // ===== ƯU TIÊN: uow → ươ
     if (this._endsWith("uo") && k === "w") {
       this.chars.pop();
       this.chars.pop();
       this.chars.push("ư", "ơ");
+      this.hasTelex = true;
       return;
     }
 
-    // ===== dd
-    if (pair === "dd") {
-      this.chars.pop();
-      this.chars.push("đ");
-      return;
-    }
-
-    // ===== aa, aw...
     if (BASE_MAP[pair]) {
       this.chars.pop();
       this.chars.push(BASE_MAP[pair]);
+      this.hasTelex = true;
       return;
     }
 
-    // ===== giữ nguyên (KHÔNG phá phụ âm)
     this.chars.push(k);
   }
 
@@ -80,39 +118,23 @@ class WordState {
     return this.chars.join("").endsWith(s);
   }
 
-  // =====================
-  // TEXT OUTPUT
-  // =====================
   getText() {
-    let out = [...this.chars];
-
-    // ===== không có telex → trả raw (fix tiếng Anh)
-    if (!this.tone && !this.hasTelexPattern()) {
-      return this.raw;
+    if (!this.hasTelex && !this.tone) {
+        return this.raw;
     }
 
-    // ===== remove tone cũ
-    out = out.map(c => removeToneChar(c));
-
-    const idx = this._findMainVowel(out);
-    if (idx === -1) return out.join("");
+    let out = this.chars.map(c => removeToneChar(c));
 
     if (this.tone) {
-      out[idx] = addTone(out[idx], this.tone);
+        const idx = this._findMainVowel(out);
+        if (idx !== -1) {
+            out[idx] = addTone(out[idx], this.tone);
+        }
     }
-
     return out.join("");
   }
-
-  hasTelexPattern() {
-    return /(aa|aw|ee|oo|ow|uw|dd)/.test(this.raw);
-  }
-
-  // =====================
-  // FIND MAIN VOWEL (FIX CHUẨN)
-  // =====================
+  
   _findMainVowel(chars) {
-    const word = chars.join("");
     let v = [];
 
     for (let i = 0; i < chars.length; i++) {
@@ -121,109 +143,64 @@ class WordState {
 
     if (v.length === 0) return -1;
 
-    // qu, gi
-    if (word.startsWith("qu")) return v[1] || v[0];
-    if (word.startsWith("gi")) return v[1] || v[0];
+    const word = chars.join("");
 
-    if (v.length === 1) return v[0];
-
-    if (v.length === 2) {
-      const pair = chars[v[0]] + chars[v[1]];
-      if (["oa", "oe", "uy"].includes(pair)) return v[1];
-      return v[0];
+    if (word.startsWith("qu") || word.startsWith("gi")) {
+        return v.length > 1 ? v[1] : v[0];
     }
 
-    if (v.length === 3) return v[1];
+    if (v.length >= 2) {
+        const pair = chars[v[0]] + chars[v[1]];
+        if (["oa", "oe", "uy", "oy"].includes(pair)) return v[1];
+        if (v.length === 3) return v[1];
+        return v[0];
+    }
 
     return v[0];
   }
 }
 
+
 // =====================
-// MULTI WORD ENGINE
+// ENGINE
 // =====================
-class TelexEngine {
-  constructor() {
-    this.raw = "";
-    this.cursor = 0;
-  }
+function transformFull(raw, cursor) {
+    let text = "";
+    let newCursor = 0;
+    let currentWordRaw = "";
 
-  reset() {
-    this.raw = "";
-    this.cursor = 0;
-  }
+    function processWord() {
+        if (currentWordRaw) {
+            const state = new WordState(currentWordRaw);
+            const wordText = state.getText();
+            text += wordText;
+            currentWordRaw = "";
+        }
+    }
 
-  insert(k) {
-    this.raw =
-      this.raw.slice(0, this.cursor) +
-      k +
-      this.raw.slice(this.cursor);
+    for (let i = 0; i < raw.length; i++) {
+        const char = raw[i];
+        if (char === ' ' || char === '\n' || char === '\t') {
+            processWord();
+            text += char;
+        } else {
+            currentWordRaw += char;
+        }
+        if (i < cursor) {
+            newCursor = text.length + currentWordRaw.length;
+        }
+    }
+    processWord();
 
-    this.cursor++;
-  }
-
-  backspace() {
-    if (this.cursor === 0) return;
-
-    this.raw =
-      this.raw.slice(0, this.cursor - 1) +
-      this.raw.slice(this.cursor);
-
-    this.cursor--;
-  }
-
-  moveLeft() {
-    this.cursor = Math.max(0, this.cursor - 1);
-  }
-
-  moveRight() {
-    this.cursor = Math.min(this.raw.length, this.cursor + 1);
-  }
-
-  build() {
-    let result = "";
-    let cursorPos = 0;
-    let i = 0;
-
-    while (i <= this.raw.length) {
-      let start = i;
-
-      while (i < this.raw.length && this.raw[i] !== " ") i++;
-
-      let rawWord = this.raw.slice(start, i);
-      let state = new WordState(rawWord);
-      let textWord = state.getText();
-
-      if (this.cursor >= start && this.cursor <= i) {
-        let local = this.cursor - start;
-        cursorPos = result.length + Math.min(local, textWord.length);
-      }
-
-      result += textWord;
-
-      if (i < this.raw.length) {
-        result += " ";
-        if (this.cursor === i) cursorPos = result.length;
-      }
-
-      i++;
+    const finalState = new WordState(currentWordRaw);
+    const remainingText = finalState.getText();
+    
+    if (cursor >= raw.length) {
+       newCursor = text.length + remainingText.length;
     }
 
     return {
-      text: result.normalize("NFC"),
-      cursor: cursorPos
+        text: text + remainingText,
+        cursorPos: newCursor
     };
-  }
-}
-
-// =====================
-// HELPERS
-// =====================
-function removeToneChar(c) {
-  return c.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
-
-function addTone(char, toneKey) {
-  const base = removeToneChar(char);
-  return (base + TONE_MAP[toneKey]).normalize("NFC");
 }
