@@ -1,5 +1,7 @@
 let contextID = -1;
-let buffer = "";
+
+let rawBuffer = "";
+let cursor = 0;
 
 // =====================
 // FOCUS / BLUR
@@ -10,7 +12,8 @@ chrome.input.ime.onFocus.addListener((context) => {
 
 chrome.input.ime.onBlur.addListener(() => {
   contextID = -1;
-  buffer = "";
+  rawBuffer = "";
+  cursor = 0;
 });
 
 // =====================
@@ -23,91 +26,100 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
   const key = keyData.key;
 
   // =====================
-  // BACKSPACE
+  // BACKSPACE (UNDO)
   // =====================
   if (key === "Backspace") {
-    if (buffer.length > 0) {
-      buffer = buffer.slice(0, -1);
-
-      if (buffer.length === 0) {
-        chrome.input.ime.clearComposition({ contextID });
-      } else {
-        updateComposition();
-      }
+    if (cursor > 0) {
+      rawBuffer =
+        rawBuffer.slice(0, cursor - 1) +
+        rawBuffer.slice(cursor);
+      cursor--;
+      render();
       return true;
     }
     return false;
   }
 
   // =====================
-  // SPACE → commit từ
+  // ARROW (MOVE CURSOR)
   // =====================
-  if (key === " ") {
-    if (buffer.length > 0) {
-      chrome.input.ime.commitText({
-        contextID,
-        text: buffer + " "
-      });
+  if (key === "ArrowLeft") {
+    cursor = Math.max(0, cursor - 1);
+    render();
+    return true;
+  }
 
-      chrome.input.ime.clearComposition({ contextID });
-      buffer = "";
-      return true;
-    }
-    return false;
+  if (key === "ArrowRight") {
+    cursor = Math.min(rawBuffer.length, cursor + 1);
+    render();
+    return true;
   }
 
   // =====================
-  // ENTER → commit
+  // SPACE / ENTER
   // =====================
-  if (key === "Enter") {
-    if (buffer.length > 0) {
-      chrome.input.ime.commitText({
-        contextID,
-        text: buffer
-      });
+  if (key === " " || key === "Enter") {
+    if (rawBuffer.length === 0) {
+      return key !== 'Enter';
+    }
 
-      chrome.input.ime.clearComposition({ contextID });
-      buffer = "";
+    const { text } = transformFull(rawBuffer, cursor);
+
+    if (key === " ") {
+      commit(text + " ");
       return true;
     }
-    return false;
+
+    if (key === "Enter") {
+      commit(text);
+      return false;
+    }
   }
 
   // =====================
-  // CHỈ NHẬN KÝ TỰ THƯỜNG
+  // CHAR INPUT
   // =====================
-  if (key.length !== 1) return false;
+  if (key.length === 1) {
+    rawBuffer =
+      rawBuffer.slice(0, cursor) +
+      key +
+      rawBuffer.slice(cursor);
 
-  // =====================
-  // BUILD WORD
-  // =====================
-  buffer += key;
+    cursor++;
+    render();
+    return true;
+  }
 
-  updateComposition();
-
-  return true;
+  return false;
 });
 
 // =====================
-// UPDATE COMPOSITION
+// RENDER
 // =====================
-function updateComposition() {
+function render() {
+  const { text, cursorPos } = transformFull(rawBuffer, cursor);
+
   chrome.input.ime.setComposition({
     contextID,
-    text: buffer,
-    cursor: buffer.length,
-
-    // 👉 KHÔNG bôi đen (UX giống Laban)
-    selectionStart: buffer.length,
-    selectionEnd: buffer.length,
-
-    // 👉 cố gắng ẩn gạch dưới
-    segments: [
-      {
-        start: 0,
-        end: buffer.length,
-        style: "none"
-      }
-    ]
+    text,
+    cursor: cursorPos,
+    selectionStart: cursorPos,
+    selectionEnd: cursorPos,
+    segments: [{ start: 0, end: text.length, style: "none" }]
   });
+}
+
+// =====================
+// COMMIT
+// =====================
+function commit(text) {
+  chrome.input.ime.commitText({
+    contextID,
+    text: text
+  });
+
+  chrome.input.ime.clearComposition({ contextID });
+
+  rawBuffer = "";
+  cursor = 0;
 }
