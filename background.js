@@ -1,4 +1,4 @@
-importScripts('core/composer.js');
+importScripts('core/telex.js', 'core/composer.js');
 
 const composer = new Composer();
 
@@ -40,8 +40,8 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
   }
 
   // =====================
-  // BACKSPACE
-  // =====================
+// BACKSPACE
+// =====================
   if (key === "Backspace") {
     if (cursor > 0) {
       rawBuffer =
