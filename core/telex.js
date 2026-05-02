@@ -1,3 +1,5 @@
+// This file contains the pure transformation logic for a single Telex word.
+
 // =====================
 // CONSTANTS
 // =====================
@@ -10,14 +12,6 @@ const BASE_MAP = {
   oo: "ô", ow: "ơ",
   uw: "ư",
   dd: "đ"
-};
-
-const TONE_MAP = {
-  s: "\u0301",
-  f: "\u0300",
-  r: "\u0309",
-  x: "\u0303",
-  j: "\u0323"
 };
 
 const VOWEL_TABLE = {
@@ -63,11 +57,10 @@ function addTone(char, toneKey) {
   return char;
 }
 
-
 // =====================
-// WORD STATE
+// WORD STATE (TELEX TRANSFORMER)
 // =====================
-class WordState {
+class TelexTransformer {
   constructor(raw = "") {
     this.raw = raw;
     this.chars = [];
@@ -158,49 +151,4 @@ class WordState {
 
     return v[0];
   }
-}
-
-
-// =====================
-// ENGINE
-// =====================
-function transformFull(raw, cursor) {
-    let text = "";
-    let newCursor = 0;
-    let currentWordRaw = "";
-
-    function processWord() {
-        if (currentWordRaw) {
-            const state = new WordState(currentWordRaw);
-            const wordText = state.getText();
-            text += wordText;
-            currentWordRaw = "";
-        }
-    }
-
-    for (let i = 0; i < raw.length; i++) {
-        const char = raw[i];
-        if (char === ' ' || char === '\n' || char === '\t') {
-            processWord();
-            text += char;
-        } else {
-            currentWordRaw += char;
-        }
-        if (i < cursor) {
-            newCursor = text.length + currentWordRaw.length;
-        }
-    }
-    processWord();
-
-    const finalState = new WordState(currentWordRaw);
-    const remainingText = finalState.getText();
-    
-    if (cursor >= raw.length) {
-       newCursor = text.length + remainingText.length;
-    }
-
-    return {
-        text: text + remainingText,
-        cursorPos: newCursor
-    };
 }
