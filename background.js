@@ -1,7 +1,18 @@
-importScripts("telex_engine.js");
+importScripts(
+  "telex_engine.js",
+  "dictionary.js",
+  "bktree.js",
+  "bigram.js",
+  "trigram.js",
+  "embedding.js",
+  "ranking.js",
+  "suggestion_ai.js"
+);
 
 let contextID = -1;
 const engine = new TelexEngine();
+
+let currentSuggestions = [];
 
 // =====================
 chrome.input.ime.onFocus.addListener(ctx => {
@@ -45,8 +56,9 @@ chrome.input.ime.onKeyEvent.addListener((id, e) => {
       text: k === " " ? text + " " : text
     });
 
-    chrome.input.ime.clearComposition({ contextID });
+    learnSentence(text.split(" "));
     engine.reset();
+    chrome.input.ime.clearComposition({ contextID });
     return true;
   }
 
@@ -63,14 +75,36 @@ chrome.input.ime.onKeyEvent.addListener((id, e) => {
 function render() {
   const { text, cursor } = engine.build();
 
+  const suggestions = getSuggestionsNeural(engine);
+  currentSuggestions = suggestions;
+
   chrome.input.ime.setComposition({
     contextID,
     text,
     cursor,
     selectionStart: cursor,
     selectionEnd: cursor,
-    segments: [
-      { start: 0, end: text.length, style: "noUnderline" }
-    ]
+    segments: [{ start: 0, end: text.length, style: "noUnderline" }]
+  });
+
+  chrome.input.ime.setCandidates({
+    contextID,
+    candidates: suggestions.map((s, i) => ({
+      candidate: s,
+      id: i
+    }))
   });
 }
+
+// =====================
+chrome.input.ime.onCandidateClicked.addListener((id, i) => {
+  const word = currentSuggestions[i];
+
+  chrome.input.ime.commitText({
+    contextID,
+    text: word + " "
+  });
+
+  learnSentence([word]);
+  engine.reset();
+});

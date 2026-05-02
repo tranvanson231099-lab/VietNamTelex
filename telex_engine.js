@@ -115,7 +115,7 @@ class WordState {
 
     if (v.length === 2) {
       const pair = chars[v[0]] + chars[v[1]];
-      if (["oa", "oe", "uy"].includes(pair)) return v[1];
+      if (["oa", "oe", "uy", "oy"].includes(pair)) return v[1];
       return v[0];
     }
 
@@ -213,6 +213,13 @@ class TelexEngine {
       cursor: cursorPos
     };
   }
+}
+
+function transformFull(raw, cursor) {
+  const engine = new TelexEngine();
+  engine.raw = raw;
+  engine.cursor = cursor;
+  return engine.build();
 }
 
 // =====================

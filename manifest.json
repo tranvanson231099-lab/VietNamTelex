@@ -1,23 +1,21 @@
 {
   "manifest_version": 3,
-  "name": "Vietnamese Keyboard IME",
-  "version": "1.0",
-  "description": "Bàn phím tiếng Việt kiểu Telex",
-
-  "permissions": [
-    "input"
-  ],
+  "name": "Vietnamese AI IME",
+  "version": "2.0",
+  "description": "Telex + AI suggestion",
 
   "background": {
     "service_worker": "background.js"
   },
 
+  "permissions": ["input"],
+
   "input_components": [
     {
-      "name": "Vietnamese Telex",
+      "name": "Vietnamese AI",
       "type": "ime",
-      "id": "vietnamese_telex",
-      "description": "Bộ gõ tiếng Việt Telex",
+      "id": "vn_ai_ime",
+      "description": "AI Vietnamese Input",
       "language": "vi",
       "layouts": ["us"]
     }
