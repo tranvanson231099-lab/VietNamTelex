@@ -1,145 +1,224 @@
-const baseMap = {
-    aa: "â", aw: "ă", ee: "ê",
-    oo: "ô", ow: "ơ", uw: "ư",
-    dd: "đ"
-  };
-  
-  const toneMap = {
-    s: "\u0301",
-    f: "\u0300",
-    r: "\u0309",
-    x: "\u0303",
-    j: "\u0323"
-  };
-  
-  const vowels = "aăâeêioôơuưy";
-  
-  // =====================
-  // TRANSFORM FULL STRING
-  // =====================
-  function transformFull(raw, cursor) {
-    let words = splitWords(raw);
-  
-    let result = "";
-    let currentPos = 0;
-    let newCursor = 0;
-  
-    for (let w of words) {
-      let transformed = transformWord(w.text);
-  
-      if (cursor >= w.start && cursor <= w.end) {
-        let localCursor = cursor - w.start;
-        newCursor = result.length + mapCursor(w.text, transformed, localCursor);
-      }
-  
-      result += transformed;
-    }
-  
-    return { text: result.normalize("NFC"), cursorPos: newCursor };
+// =====================
+// CONSTANTS
+// =====================
+const TONE_KEYS = ["s", "f", "r", "x", "j"];
+const VOWELS = "aăâeêioôơuưy";
+
+const BASE_MAP = {
+  aa: "â", aw: "ă",
+  ee: "ê",
+  oo: "ô", ow: "ơ",
+  uw: "ư",
+  dd: "đ"
+};
+
+const TONE_MAP = {
+  s: "\u0301",
+  f: "\u0300",
+  r: "\u0309",
+  x: "\u0303",
+  j: "\u0323"
+};
+
+// =====================
+// WORD STATE
+// =====================
+class WordState {
+  constructor(raw = "") {
+    this.raw = raw;
+    this.chars = [];
+    this.tone = null;
+    this.build();
   }
-  
-  // =====================
-  // SPLIT WORDS
-  // =====================
-  function splitWords(text) {
-    let words = [];
-    let start = 0;
-  
-    for (let i = 0; i <= text.length; i++) {
-      if (i === text.length || text[i] === " ") {
-        words.push({
-          text: text.slice(start, i),
-          start,
-          end: i
-        });
-  
-        if (i < text.length) {
-          words.push({
-            text: " ",
-            start: i,
-            end: i + 1
-          });
-        }
-  
-        start = i + 1;
-      }
+
+  build() {
+    this.chars = [];
+    this.tone = null;
+
+    for (let k of this.raw) {
+      this._input(k);
     }
-  
-    return words;
   }
-  
-  // =====================
-  // TRANSFORM 1 WORD
-  // =====================
-  function transformWord(input) {
-    let text = input.toLowerCase();
-  
+
+  _input(k) {
+    if (TONE_KEYS.includes(k)) {
+      this.tone = k; // overwrite => đổi dấu tự do
+      return;
+    }
+
+    // ===== base transform incremental
+    const last = this.chars[this.chars.length - 1] || "";
+    const pair = last + k;
+
     // uow → ươ
-    text = text.replace(/uow/g, "ươ");
-  
-    // base transform
-    for (let k in baseMap) {
-      text = text.replace(new RegExp(k, "g"), baseMap[k]);
+    if (this._endsWith("uo") && k === "w") {
+      this.chars.pop();
+      this.chars.pop();
+      this.chars.push("ư", "ơ");
+      return;
     }
-  
-    // tone
-    let last = text.slice(-1);
-    let tone = toneMap[last];
-  
-    if (!tone) return text;
-  
-    text = text.slice(0, -1);
-    text = removeTone(text);
-  
-    let idx = findMainVowel(text);
-    if (idx === -1) return text;
-  
-    return (
-      text.slice(0, idx) +
-      (text[idx] + tone) +
-      text.slice(idx + 1)
-    );
+
+    // dd
+    if (pair === "dd") {
+      this.chars.pop();
+      this.chars.push("đ");
+      return;
+    }
+
+    // aa, aw, ...
+    if (BASE_MAP[pair]) {
+      this.chars.pop();
+      this.chars.push(BASE_MAP[pair]);
+      return;
+    }
+
+    this.chars.push(k);
   }
-  
-  // =====================
-  // CURSOR MAP (ĐƠN GIẢN)
-  // =====================
-  function mapCursor(raw, transformed, cursor) {
-    return Math.min(cursor, transformed.length);
+
+  _endsWith(s) {
+    return this.chars.join("").endsWith(s);
   }
-  
+
   // =====================
-  // REMOVE TONE
+  // TEXT OUTPUT
   // =====================
-  function removeTone(str) {
-    return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  getText() {
+    let out = [...this.chars];
+
+    if (!this.tone) return out.join("");
+
+    const idx = this._findMainVowel(out);
+    if (idx === -1) return out.join("");
+
+    out[idx] = addTone(out[idx], this.tone);
+    return out.join("");
   }
-  
+
   // =====================
-  // FIND MAIN VOWEL
+  // RULE TIẾNG VIỆT
   // =====================
-  function findMainVowel(word) {
+  _findMainVowel(chars) {
     let v = [];
-  
-    for (let i = 0; i < word.length; i++) {
-      if (vowels.includes(word[i])) v.push(i);
+
+    for (let i = 0; i < chars.length; i++) {
+      if (VOWELS.includes(chars[i])) v.push(i);
     }
-  
+
     if (v.length === 0) return -1;
-  
+
+    const word = chars.join("");
+
     if (word.startsWith("qu")) return v[1] || v[0];
     if (word.startsWith("gi")) return v[1] || v[0];
-  
+
     if (v.length === 1) return v[0];
-  
+
     if (v.length === 2) {
-      let [i1, i2] = v;
-      let pair = word[i1] + word[i2];
-      if (["oa", "oe", "uy"].includes(pair)) return i2;
-      return i1;
+      const pair = chars[v[0]] + chars[v[1]];
+      if (["oa", "oe", "uy"].includes(pair)) return v[1];
+      return v[0];
     }
-  
+
     if (v.length === 3) return v[1];
-  
+
     return v[0];
   }
+}
+
+// =====================
+// ENGINE MULTI WORD
+// =====================
+class TelexEngine {
+  constructor() {
+    this.raw = "";
+    this.cursor = 0;
+  }
+
+  reset() {
+    this.raw = "";
+    this.cursor = 0;
+  }
+
+  // =====================
+  // INPUT
+  // =====================
+  insert(k) {
+    this.raw =
+      this.raw.slice(0, this.cursor) +
+      k +
+      this.raw.slice(this.cursor);
+
+    this.cursor++;
+  }
+
+  backspace() {
+    if (this.cursor === 0) return;
+
+    this.raw =
+      this.raw.slice(0, this.cursor - 1) +
+      this.raw.slice(this.cursor);
+
+    this.cursor--;
+  }
+
+  moveLeft() {
+    this.cursor = Math.max(0, this.cursor - 1);
+  }
+
+  moveRight() {
+    this.cursor = Math.min(this.raw.length, this.cursor + 1);
+  }
+
+  // =====================
+  // BUILD FULL TEXT
+  // =====================
+  build() {
+    let result = "";
+    let cursorPos = 0;
+    let index = 0;
+
+    while (index <= this.raw.length) {
+      let start = index;
+
+      // find word
+      while (index < this.raw.length && this.raw[index] !== " ") {
+        index++;
+      }
+
+      let wordRaw = this.raw.slice(start, index);
+      let state = new WordState(wordRaw);
+      let wordText = state.getText();
+
+      // cursor mapping
+      if (this.cursor >= start && this.cursor <= index) {
+        const local = this.cursor - start;
+        cursorPos = result.length + Math.min(local, wordText.length);
+      }
+
+      result += wordText;
+
+      // space
+      if (index < this.raw.length) {
+        result += " ";
+        if (this.cursor === index) {
+          cursorPos = result.length;
+        }
+      }
+
+      index++;
+    }
+
+    return {
+      text: result.normalize("NFC"),
+      cursor: cursorPos
+    };
+  }
+}
+
+// =====================
+// TONE APPLY
+// =====================
+function addTone(char, toneKey) {
+  const base = char.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return (base + TONE_MAP[toneKey]).normalize("NFC");
+}
