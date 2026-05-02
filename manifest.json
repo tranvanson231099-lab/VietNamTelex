@@ -3,13 +3,12 @@
   "name": "Vietnamese AI IME",
   "version": "2.0",
   "description": "Telex + AI suggestion",
-
   "background": {
     "service_worker": "background.js"
   },
-
-  "permissions": ["input"],
-
+  "permissions": [
+    "input"
+  ],
   "input_components": [
     {
       "name": "Vietnamese AI",
@@ -17,7 +16,9 @@
       "id": "vn_ai_ime",
       "description": "AI Vietnamese Input",
       "language": "vi",
-      "layouts": ["us"]
+      "layouts": [
+        "us"
+      ]
     }
   ]
 }
