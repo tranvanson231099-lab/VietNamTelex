@@ -4,10 +4,10 @@ const BASE_MAP = { aa: "â", aw: "ă", ee: "ê", oo: "ô", ow: "ơ", uw: "ư", d
 const TONE_MAP = { s: "\u0301", f: "\u0300", r: "\u0309", x: "\u0303", j: "\u0323" };
 
 // =====================
-// TelexTransformer (ES5 Style)
+// TelexTransformer
 // =====================
 function TelexTransformer(raw) {
-  this.raw = raw;
+  this.raw = raw || "";
 }
 
 TelexTransformer.prototype.getText = function() {
@@ -15,8 +15,7 @@ TelexTransformer.prototype.getText = function() {
 };
 
 TelexTransformer.prototype.transformWord = function(raw) {
-  if (typeof raw !== 'string') return ""; // Defensive check
-  if (!this.isVietnamese(raw)) return raw;
+  if (typeof raw !== 'string' || !this.isVietnamese(raw)) return raw;
   let tone = this.extractTone(raw);
   let chars = [];
   for (let i = 0; i < raw.length; i++) {
@@ -91,65 +90,75 @@ TelexTransformer.prototype.findMainVowel = function(chars) {
 };
 
 // =====================
-// Composer (ES5 Style)
+// Composer
 // =====================
 function Composer() {}
 
 Composer.prototype.transform = function(raw, cursor) {
-  let text = "";
-  let newCursor = 0;
-  let currentWordRaw = "";
-
-  function processWord() {
-    if (currentWordRaw) {
-      const transformer = new TelexTransformer(currentWordRaw);
-      const wordText = transformer.getText() || ""; // Defensive check
-      text += wordText;
-      currentWordRaw = "";
-    }
-  }
-
-  for (let i = 0; i < raw.length; i++) {
-    const char = raw[i];
-    if (char === ' ' || char === '\n' || char === '\t') {
-      processWord();
-      text += char;
-    } else {
-      currentWordRaw += char;
-    }
-    if (i < cursor) {
-        const textForCursor = new TelexTransformer(currentWordRaw).getText() || ""; // Defensive check
-        newCursor = text.length + textForCursor.length;
-    }
-  }
-  processWord();
-
-  if (cursor >= raw.length) {
-    const remainingText = new TelexTransformer(currentWordRaw).getText() || ""; // Defensive check
-    newCursor = text.length + remainingText.length;
-  }
-
+  raw = String(raw || '');
+  const rawToCursor = raw.slice(0, cursor);
+  const transformedToCursor = new TelexTransformer(rawToCursor).getText() || "";
+  const newCursor = transformedToCursor.length;
+  const transformedText = new TelexTransformer(raw).getText() || "";
   return {
-    text: text,
-    cursorPos: newCursor
+    text: transformedText,
+    cursorPos: newCursor,
   };
 };
 
 // =====================
-// SCRIPT LOGIC
+// SCRIPT LOGIC & STATE MANAGEMENT
 // =====================
 const composer = new Composer();
 let contextID = -1;
 let rawBuffer = "";
 let cursor = 0;
 
-chrome.input.ime.onFocus.addListener(context => { contextID = context.contextID; });
-chrome.input.ime.onBlur.addListener(() => { contextID = -1; rawBuffer = ""; cursor = 0; });
-chrome.input.ime.onSurroundingTextChanged.addListener(() => { rawBuffer = ""; cursor = 0; });
+// A robust lock to prevent race conditions from onSurroundingTextChanged.
+let isComposing = false;
+let compositionLockTimeout = null;
+
+function lockComposition() {
+    isComposing = true;
+    if (compositionLockTimeout) {
+        clearTimeout(compositionLockTimeout);
+    }
+    compositionLockTimeout = setTimeout(() => {
+        isComposing = false;
+    }, 100); // A 100ms lock is enough to debounce multiple spurious events.
+}
+
+// =====================
+// EVENT LISTENERS
+// =====================
+
+chrome.input.ime.onFocus.addListener(context => {
+    contextID = context.contextID;
+    rawBuffer = "";
+    cursor = 0;
+});
+
+chrome.input.ime.onBlur.addListener(() => {
+    contextID = -1;
+    rawBuffer = "";
+    cursor = 0;
+});
+
+chrome.input.ime.onSurroundingTextChanged.addListener(() => {
+    // If the change was caused by our own composition, the lock will be active.
+    if (isComposing) {
+        return; // Ignore the event.
+    }
+    // Otherwise, it was a manual change (e.g., mouse click), so reset state.
+    rawBuffer = "";
+    cursor = 0;
+});
 
 chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
   if (keyData.type !== "keydown" || contextID === -1) return false;
+
   const key = keyData.key;
+
   if (keyData.ctrlKey || keyData.altKey || keyData.metaKey) return false;
 
   if (key === "Backspace") {
@@ -162,42 +171,37 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
     return false;
   }
 
-  if (key === "ArrowLeft") {
-    cursor = Math.max(0, cursor - 1);
-    render();
-    return true;
-  }
-
-  if (key === "ArrowRight") {
-    cursor = Math.min(rawBuffer.length, cursor + 1);
+  if (key === "ArrowLeft" || key === "ArrowRight") { // Handle both arrows
+    cursor = key === "ArrowLeft" ? Math.max(0, cursor - 1) : Math.min(rawBuffer.length, cursor + 1);
     render();
     return true;
   }
 
   if (key === "Enter") {
     if (rawBuffer.length > 0) {
-      const { text } = composer.transform(rawBuffer, cursor);
-      chrome.input.ime.commitText({ contextID, text });
-      chrome.input.ime.clearComposition({ contextID });
-      rawBuffer = "";
-      cursor = 0;
+        const { text } = composer.transform(rawBuffer, cursor);
+        lockComposition();
+        chrome.input.ime.commitText({ contextID, text });
+        rawBuffer = "";
+        cursor = 0;
     }
-    return false;
+    return false; // Allow default Enter behavior (e.g., new line).
   }
 
   if (key === " ") {
     if (rawBuffer.length > 0) {
-      const { text } = composer.transform(rawBuffer, cursor);
-      chrome.input.ime.commitText({ contextID, text: text + " " });
-      chrome.input.ime.clearComposition({ contextID });
-      rawBuffer = "";
-      cursor = 0;
-      return true;
+        const { text } = composer.transform(rawBuffer, cursor);
+        lockComposition();
+        chrome.input.ime.commitText({ contextID, text: text + " " });
+        rawBuffer = "";
+        cursor = 0;
+        return true;
     }
-    return false;
+    return false; // Allow default space behavior.
   }
 
-  if (key.length === 1) {
+  // Handle character input
+  if (key.length === 1 && !/[\s]/.test(key)) {
     rawBuffer = rawBuffer.slice(0, cursor) + key + rawBuffer.slice(cursor);
     cursor++;
     render();
@@ -209,10 +213,10 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
 
 function render() {
   if (contextID === -1) return;
-  const transformResult = composer.transform(rawBuffer, cursor) || {}; // Defensive check
-  const text = transformResult.text || ""; // Defensive check
-  const cursorPos = transformResult.cursorPos || 0; // Defensive check
   
+  const { text, cursorPos } = composer.transform(rawBuffer, cursor);
+  
+  lockComposition(); // Activate the lock before updating the composition.
   chrome.input.ime.setComposition({
     contextID,
     text,
