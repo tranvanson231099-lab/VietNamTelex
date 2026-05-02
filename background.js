@@ -1,3 +1,5 @@
+importScripts('telex_engine.js');
+
 let contextID = -1;
 
 let rawBuffer = "";
