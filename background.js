@@ -1,69 +1,93 @@
-importScripts(
-  "telex_engine.js",
-  "dictionary.js",
-  "bktree.js",
-  "bigram.js",
-  "trigram.js",
-  "embedding.js",
-  "ranking.js",
-  "suggestion_ai.js"
-);
+importScripts('telex_engine.js');
 
 let contextID = -1;
-const engine = new TelexEngine();
 
-let currentSuggestions = [];
+let rawBuffer = "";
+let cursor = 0;
 
 // =====================
-chrome.input.ime.onFocus.addListener(ctx => {
-  contextID = ctx.contextID;
+// FOCUS / BLUR
+// =====================
+chrome.input.ime.onFocus.addListener((context) => {
+  contextID = context.contextID;
 });
 
 chrome.input.ime.onBlur.addListener(() => {
   contextID = -1;
-  engine.reset();
+  rawBuffer = "";
+  cursor = 0;
 });
 
 // =====================
-chrome.input.ime.onKeyEvent.addListener((id, e) => {
-  if (e.type !== "keydown" || contextID === -1) return false;
+// KEY EVENT
+// =====================
+chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
+  if (keyData.type !== "keydown") return false;
+  if (contextID === -1) return false;
 
-  const k = e.key;
+  const key = keyData.key;
 
-  if (k === "Backspace") {
-    engine.backspace();
+  // =====================
+  // BACKSPACE (UNDO)
+  // =====================
+  if (key === "Backspace") {
+    if (cursor > 0) {
+      rawBuffer =
+        rawBuffer.slice(0, cursor - 1) +
+        rawBuffer.slice(cursor);
+      cursor--;
+      render();
+      return true;
+    }
+    return false;
+  }
+
+  // =====================
+  // ARROW (MOVE CURSOR)
+  // =====================
+  if (key === "ArrowLeft") {
+    cursor = Math.max(0, cursor - 1);
     render();
     return true;
   }
 
-  if (k === "ArrowLeft") {
-    engine.moveLeft();
+  if (key === "ArrowRight") {
+    cursor = Math.min(rawBuffer.length, cursor + 1);
     render();
     return true;
   }
 
-  if (k === "ArrowRight") {
-    engine.moveRight();
-    render();
-    return true;
+  // =====================
+  // SPACE / ENTER
+  // =====================
+  if (key === " " || key === "Enter") {
+    if (rawBuffer.length === 0) {
+      return key !== 'Enter';
+    }
+
+    const { text } = transformFull(rawBuffer, cursor);
+
+    if (key === " ") {
+      commit(text + " ");
+      return true;
+    }
+
+    if (key === "Enter") {
+      commit(text);
+      return false;
+    }
   }
 
-  if (k === " " || k === "Enter") {
-    const { text } = engine.build();
+  // =====================
+  // CHAR INPUT
+  // =====================
+  if (key.length === 1) {
+    rawBuffer =
+      rawBuffer.slice(0, cursor) +
+      key +
+      rawBuffer.slice(cursor);
 
-    chrome.input.ime.commitText({
-      contextID,
-      text: k === " " ? text + " " : text
-    });
-
-    learnSentence(text.split(" "));
-    engine.reset();
-    chrome.input.ime.clearComposition({ contextID });
-    return true;
-  }
-
-  if (k.length === 1) {
-    engine.insert(k);
+    cursor++;
     render();
     return true;
   }
@@ -72,39 +96,32 @@ chrome.input.ime.onKeyEvent.addListener((id, e) => {
 });
 
 // =====================
+// RENDER
+// =====================
 function render() {
-  const { text, cursor } = engine.build();
-
-  const suggestions = getSuggestionsNeural(engine);
-  currentSuggestions = suggestions;
+  const { text, cursorPos } = transformFull(rawBuffer, cursor);
 
   chrome.input.ime.setComposition({
     contextID,
     text,
-    cursor,
-    selectionStart: cursor,
-    selectionEnd: cursor,
-    segments: [{ start: 0, end: text.length, style: "noUnderline" }]
-  });
-
-  chrome.input.ime.setCandidates({
-    contextID,
-    candidates: suggestions.map((s, i) => ({
-      candidate: s,
-      id: i
-    }))
+    cursor: cursorPos,
+    selectionStart: cursorPos,
+    selectionEnd: cursorPos,
+    segments: [{ start: 0, end: text.length, style: "none" }]
   });
 }
 
 // =====================
-chrome.input.ime.onCandidateClicked.addListener((id, i) => {
-  const word = currentSuggestions[i];
-
+// COMMIT
+// =====================
+function commit(text) {
   chrome.input.ime.commitText({
     contextID,
-    text: word + " "
+    text: text
   });
 
-  learnSentence([word]);
-  engine.reset();
-});
+  chrome.input.ime.clearComposition({ contextID });
+
+  rawBuffer = "";
+  cursor = 0;
+}
