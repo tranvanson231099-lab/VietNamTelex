@@ -1,14 +1,14 @@
-importScripts('core/composer.js');
+importScripts('telex_engine.js');
 
 let contextID = -1;
+
 let rawBuffer = "";
 let cursor = 0;
-const composer = new Composer();
 
 // =====================
-// Event Listeners
+// FOCUS / BLUR
 // =====================
-chrome.input.ime.onFocus.addListener(context => {
+chrome.input.ime.onFocus.addListener((context) => {
   contextID = context.contextID;
 });
 
@@ -18,19 +18,113 @@ chrome.input.ime.onBlur.addListener(() => {
   cursor = 0;
 });
 
+// FIX click chuột
+chrome.input.ime.onSurroundingTextChanged.addListener(() => {
+  rawBuffer = "";
+  cursor = 0;
+});
+
+// =====================
+// KEY EVENT
+// =====================
 chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
-  if (keyData.type !== "keydown" || contextID === -1) {
-    return false;
-  }
+  if (keyData.type !== "keydown" || contextID === -1) return false;
 
   const key = keyData.key;
 
-  if (handleSpecialKey(key)) {
+  // ✅ không chặn phím hệ thống
+  if (keyData.ctrlKey || keyData.altKey || keyData.metaKey) {
+    return false;
+  }
+
+  // =====================
+  // BACKSPACE
+  // =====================
+  if (key === "Backspace") {
+    if (cursor > 0) {
+      rawBuffer =
+        rawBuffer.slice(0, cursor - 1) +
+        rawBuffer.slice(cursor);
+      cursor--;
+      render();
+      return true;
+    }
+    return false;
+  }
+
+  // =====================
+  // ARROW
+  // =====================
+  if (key === "ArrowLeft") {
+    cursor = Math.max(0, cursor - 1);
+    render();
     return true;
   }
 
-  if (key.length === 1) {
-    insertChar(key);
+  if (key === "ArrowRight") {
+    cursor = Math.min(rawBuffer.length, cursor + 1);
+    render();
+    return true;
+  }
+
+  // =====================
+  // ENTER
+  // =====================
+  if (key === "Enter") {
+    if (rawBuffer.length > 0) {
+      const { text } = transformFull(rawBuffer, cursor);
+
+      chrome.input.ime.commitText({
+        contextID,
+        text
+      });
+
+      chrome.input.ime.clearComposition({ contextID });
+
+      rawBuffer = "";
+      cursor = 0;
+    }
+
+    return false; // giữ hành vi xuống dòng
+  }
+
+  // =====================
+  // SPACE
+  // =====================
+  if (key === " ") {
+    if (rawBuffer.length > 0) {
+      const { text } = transformFull(rawBuffer, cursor);
+
+      chrome.input.ime.commitText({
+        contextID,
+        text: text + " "
+      });
+
+      chrome.input.ime.clearComposition({ contextID });
+
+      rawBuffer = "";
+      cursor = 0;
+      return true;
+    }
+    return false;
+  }
+
+  // =====================
+  // TEXT INPUT
+  // =====================
+  if (
+    key.length === 1 &&
+    !keyData.ctrlKey &&
+    !keyData.altKey &&
+    !keyData.metaKey
+  ) {
+    rawBuffer =
+      rawBuffer.slice(0, cursor) +
+      key +
+      rawBuffer.slice(cursor);
+
+    cursor++;
+    render();
     return true;
   }
 
@@ -38,95 +132,23 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
 });
 
 // =====================
-// Key Handlers
-// =====================
-function handleSpecialKey(key) {
-  switch (key) {
-    case "Backspace":
-      return handleBackspace();
-    case "Enter":
-      return handleEnter();
-    case " ": // Spacebar
-      return handleSpace();
-    case "ArrowLeft":
-      return handleArrowLeft();
-    case "ArrowRight":
-      return handleArrowRight();
-    default:
-      return false;
-  }
-}
-
-function handleBackspace() {
-  if (cursor > 0) {
-    rawBuffer = rawBuffer.slice(0, cursor - 1) + rawBuffer.slice(cursor);
-    cursor--;
-    render();
-    return true;
-  }
-  return false;
-}
-
-function handleEnter() {
-  if (rawBuffer.length > 0) {
-    const { text } = composer.transform(rawBuffer, cursor);
-    commit(text);
-  }
-  return false; // Allow Enter to perform its default action (e.g., new line)
-}
-
-function handleSpace() {
-  if (rawBuffer.length > 0) {
-    const { text } = composer.transform(rawBuffer, cursor);
-    commit(text + " ");
-    return true;
-  }
-  return false; // Allow space to be inserted if buffer is empty
-}
-
-function handleArrowLeft() {
-  if (cursor > 0) {
-    cursor--;
-    render();
-  }
-  return true;
-}
-
-function handleArrowRight() {
-  if (cursor < rawBuffer.length) {
-    cursor++;
-    render();
-  }
-  return true;
-}
-
-function insertChar(key) {
-  rawBuffer = rawBuffer.slice(0, cursor) + key + rawBuffer.slice(cursor);
-  cursor++;
-  render();
-}
-
-// =====================
-// IME API Calls
+// RENDER
 // =====================
 function render() {
-  const { text, cursorPos } = composer.transform(rawBuffer, cursor);
+  const { text, cursorPos } = transformFull(rawBuffer, cursor);
+
   chrome.input.ime.setComposition({
     contextID,
     text,
     cursor: cursorPos,
     selectionStart: cursorPos,
     selectionEnd: cursorPos,
-    segments: [{ start: 0, end: text.length, style: "noUnderline" }]
+    segments: [
+      {
+        start: 0,
+        end: text.length,
+        style: "noUnderline" // ✅ FIX crash
+      }
+    ]
   });
-}
-
-function commit(text) {
-  chrome.input.ime.commitText({
-    contextID,
-    text: text
-  });
-  chrome.input.ime.clearComposition({ contextID });
-  rawBuffer = "";
-  cursor = 0;
 }

@@ -1,9 +1,4 @@
-// This file contains the pure transformation logic for a single Telex word.
-
-// =====================
-// CONSTANTS
-// =====================
-const TONE_KEYS = ["s", "f", "r", "x", "j"];
+const TONE_KEYS = ["s","f","r","x","j"];
 const VOWELS = "aăâeêioôơuưy";
 
 const BASE_MAP = {
@@ -14,141 +9,179 @@ const BASE_MAP = {
   dd: "đ"
 };
 
-const VOWEL_TABLE = {
-  a: "aàáảãạ",
-  ă: "ăằắẳẵặ",
-  â: "âầấẩẫậ",
-  e: "eèéẻẽẹ",
-  ê: "êềếểễệ",
-  i: "iìíỉĩị",
-  o: "oòóỏõọ",
-  ô: "ôồốổỗộ",
-  ơ: "ơờớởỡợ",
-  u: "uùúủũụ",
-  ư: "ưừứửữự",
-  y: "yỳýỷỹỵ"
+const TONE_MAP = {
+  s: "\u0301",
+  f: "\u0300",
+  r: "\u0309",
+  x: "\u0303",
+  j: "\u0323"
 };
 
 // =====================
-// HELPERS
+// FULL TRANSFORM
 // =====================
-function removeToneChar(c) {
-  for (let key in VOWEL_TABLE) {
-    if (VOWEL_TABLE[key].includes(c)) return key;
-  }
-  return c;
-}
+function transformFull(raw, cursor) {
+  let words = splitWords(raw);
 
-function addTone(char, toneKey) {
-  const base = removeToneChar(char);
-  const toneIndex = ["", "f", "s", "r", "x", "j"].indexOf(toneKey);
-  if (toneIndex === -1) return char;
-  const toneName = ["ngang", "huyền", "sắc", "hỏi", "ngã", "nặng"];
-  const tone = toneName[toneIndex];
+  let result = "";
+  let newCursor = 0;
 
-  for (let key in VOWEL_TABLE) {
-    if (key === base) {
-        const index = {
-            "ngang": 0, "huyền": 1, "sắc": 2, "hỏi": 3, "ngã": 4, "nặng": 5
-        }[tone];
-        return VOWEL_TABLE[key][index] || key;
+  for (let w of words) {
+    let transformed = transformWord(w.text);
+
+    if (cursor >= w.start && cursor <= w.end) {
+      let local = cursor - w.start;
+      newCursor = result.length + Math.min(local, transformed.length);
     }
+
+    result += transformed;
   }
-  return char;
+
+  return { text: result.normalize("NFC"), cursorPos: newCursor };
 }
 
 // =====================
-// WORD STATE (TELEX TRANSFORMER)
+// SPLIT WORD
 // =====================
-class TelexTransformer {
-  constructor(raw = "") {
-    this.raw = raw;
-    this.chars = [];
-    this.tone = null;
-    this.hasTelex = false;
-    this.build();
-  }
+function splitWords(text) {
+  let words = [];
+  let start = 0;
 
-  build() {
-    this.chars = [];
-    this.tone = null;
-    this.hasTelex = false;
+  for (let i = 0; i <= text.length; i++) {
+    if (i === text.length || text[i] === " ") {
+      words.push({
+        text: text.slice(start, i),
+        start,
+        end: i
+      });
 
-    for (let k of this.raw) {
-      this._input(k);
+      if (i < text.length) {
+        words.push({
+          text: " ",
+          start: i,
+          end: i + 1
+        });
+      }
+
+      start = i + 1;
     }
   }
 
-  _input(k) {
-    if (TONE_KEYS.includes(k)) {
-      this.tone = k;
-      this.hasTelex = true;
-      return;
+  return words;
+}
+
+// =====================
+// TRANSFORM WORD
+// =====================
+function transformWord(raw) {
+  if (!isVietnamese(raw)) return raw;
+
+  let tone = extractTone(raw);
+  let chars = [];
+
+  for (let i = 0; i < raw.length; i++) {
+    let k = raw[i];
+
+    if (TONE_KEYS.includes(k)) continue;
+
+    let last = chars[chars.length - 1] || "";
+    let pair = last + k;
+
+    // ✅ FIX ươ
+    if (
+      chars.length >= 2 &&
+      chars[chars.length - 2] === "u" &&
+      chars[chars.length - 1] === "o" &&
+      k === "w"
+    ) {
+      chars.pop();
+      chars.pop();
+      chars.push("ư", "ơ");
+      continue;
     }
 
-    const last = this.chars.length > 0 ? this.chars[this.chars.length - 1] : "";
-    const pair = last + k;
-
-    if (this._endsWith("uo") && k === "w") {
-      this.chars.pop();
-      this.chars.pop();
-      this.chars.push("ư", "ơ");
-      this.hasTelex = true;
-      return;
+    if (pair === "dd") {
+      chars.pop();
+      chars.push("đ");
+      continue;
     }
 
     if (BASE_MAP[pair]) {
-      this.chars.pop();
-      this.chars.push(BASE_MAP[pair]);
-      this.hasTelex = true;
-      return;
+      chars.pop();
+      chars.push(BASE_MAP[pair]);
+      continue;
     }
 
-    this.chars.push(k);
+    chars.push(k);
   }
 
-  _endsWith(s) {
-    return this.chars.join("").endsWith(s);
+  chars = chars.map(removeTone);
+
+  if (!tone) return chars.join("");
+
+  let idx = findMainVowel(chars);
+  if (idx === -1) return chars.join("");
+
+  chars[idx] = addTone(chars[idx], tone);
+
+  return chars.join("");
+}
+
+// =====================
+function extractTone(raw) {
+  for (let i = raw.length - 1; i >= 0; i--) {
+    if (TONE_KEYS.includes(raw[i])) return raw[i];
+  }
+  return null;
+}
+
+// =====================
+// FIX nhận diện
+function isVietnamese(raw) {
+  if (/[ăâêôơưđáàảãạ]/i.test(raw)) return false;
+  return /(aa|aw|ee|oo|ow|uw|dd|[sfrxj])/i.test(raw);
+}
+
+// =====================
+function removeTone(c) {
+  return c.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function addTone(c, t) {
+  return (removeTone(c) + TONE_MAP[t]).normalize("NFC");
+}
+
+// =====================
+// FIND MAIN VOWEL
+// =====================
+function findMainVowel(chars) {
+  let v = [];
+
+  for (let i = 0; i < chars.length; i++) {
+    if (VOWELS.includes(chars[i])) v.push(i);
   }
 
-  getText() {
-    if (!this.hasTelex && !this.tone) {
-        return this.raw;
-    }
+  if (v.length === 0) return -1;
 
-    let out = this.chars.map(c => removeToneChar(c));
+  const word = chars.join("");
 
-    if (this.tone) {
-        const idx = this._findMainVowel(out);
-        if (idx !== -1) {
-            out[idx] = addTone(out[idx], this.tone);
-        }
-    }
-    return out.join("");
+  if (word.startsWith("qu")) return v[1] || v[0];
+  if (word.startsWith("gi")) return v[1] || v[0];
+
+  if (v.length === 1) return v[0];
+
+  if (v.length === 2) {
+    const [i1, i2] = v;
+
+    if (i2 < chars.length - 1) return i2;
+
+    const pair = chars[i1] + chars[i2];
+    if (["oa","oe","uy"].includes(pair)) return i2;
+
+    return i1;
   }
-  
-  _findMainVowel(chars) {
-    let v = [];
 
-    for (let i = 0; i < chars.length; i++) {
-      if (VOWELS.includes(chars[i])) v.push(i);
-    }
+  if (v.length === 3) return v[1];
 
-    if (v.length === 0) return -1;
-
-    const word = chars.join("");
-
-    if (word.startsWith("qu") || word.startsWith("gi")) {
-        return v.length > 1 ? v[1] : v[0];
-    }
-
-    if (v.length >= 2) {
-        const pair = chars[v[0]] + chars[v[1]];
-        if (["oa", "oe", "uy", "oy"].includes(pair)) return v[1];
-        if (v.length === 3) return v[1];
-        return v[0];
-    }
-
-    return v[0];
-  }
+  return v[0];
 }
