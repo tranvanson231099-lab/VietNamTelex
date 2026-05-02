@@ -1,5 +1,5 @@
 // This file handles the composition of multiple words and cursor mapping.
-importScripts('telex.js');
+importScripts('core/telex.js');
 
 // =====================
 // COMPOSER
