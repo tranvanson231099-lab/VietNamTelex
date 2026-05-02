@@ -1,93 +1,57 @@
-importScripts('telex_engine.js');
+importScripts("telex_engine.js");
 
 let contextID = -1;
-
-let rawBuffer = "";
-let cursor = 0;
+const engine = new TelexEngine();
 
 // =====================
-// FOCUS / BLUR
-// =====================
-chrome.input.ime.onFocus.addListener((context) => {
-  contextID = context.contextID;
+chrome.input.ime.onFocus.addListener(ctx => {
+  contextID = ctx.contextID;
 });
 
 chrome.input.ime.onBlur.addListener(() => {
   contextID = -1;
-  rawBuffer = "";
-  cursor = 0;
+  engine.reset();
 });
 
 // =====================
-// KEY EVENT
-// =====================
-chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
-  if (keyData.type !== "keydown") return false;
-  if (contextID === -1) return false;
+chrome.input.ime.onKeyEvent.addListener((id, e) => {
+  if (e.type !== "keydown" || contextID === -1) return false;
 
-  const key = keyData.key;
+  const k = e.key;
 
-  // =====================
-  // BACKSPACE (UNDO)
-  // =====================
-  if (key === "Backspace") {
-    if (cursor > 0) {
-      rawBuffer =
-        rawBuffer.slice(0, cursor - 1) +
-        rawBuffer.slice(cursor);
-      cursor--;
-      render();
-      return true;
-    }
-    return false;
-  }
-
-  // =====================
-  // ARROW (MOVE CURSOR)
-  // =====================
-  if (key === "ArrowLeft") {
-    cursor = Math.max(0, cursor - 1);
+  if (k === "Backspace") {
+    engine.backspace();
     render();
     return true;
   }
 
-  if (key === "ArrowRight") {
-    cursor = Math.min(rawBuffer.length, cursor + 1);
+  if (k === "ArrowLeft") {
+    engine.moveLeft();
     render();
     return true;
   }
 
-  // =====================
-  // SPACE / ENTER
-  // =====================
-  if (key === " " || key === "Enter") {
-    if (rawBuffer.length === 0) {
-      return key !== 'Enter';
-    }
-
-    const { text } = transformFull(rawBuffer, cursor);
-
-    if (key === " ") {
-      commit(text + " ");
-      return true;
-    }
-
-    if (key === "Enter") {
-      commit(text);
-      return false;
-    }
+  if (k === "ArrowRight") {
+    engine.moveRight();
+    render();
+    return true;
   }
 
-  // =====================
-  // CHAR INPUT
-  // =====================
-  if (key.length === 1) {
-    rawBuffer =
-      rawBuffer.slice(0, cursor) +
-      key +
-      rawBuffer.slice(cursor);
+  if (k === " " || k === "Enter") {
+    const { text } = engine.build();
 
-    cursor++;
+    chrome.input.ime.commitText({
+      contextID,
+      text: k === " " ? text + " " : text
+    });
+
+    chrome.input.ime.clearComposition({ contextID });
+    engine.reset();
+    return true;
+  }
+
+  if (k.length === 1) {
+    engine.insert(k);
     render();
     return true;
   }
@@ -96,32 +60,17 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
 });
 
 // =====================
-// RENDER
-// =====================
 function render() {
-  const { text, cursorPos } = transformFull(rawBuffer, cursor);
+  const { text, cursor } = engine.build();
 
   chrome.input.ime.setComposition({
     contextID,
     text,
-    cursor: cursorPos,
-    selectionStart: cursorPos,
-    selectionEnd: cursorPos,
-    segments: [{ start: 0, end: text.length, style: "noUnderline" }]
+    cursor,
+    selectionStart: cursor,
+    selectionEnd: cursor,
+    segments: [
+      { start: 0, end: text.length, style: "noUnderline" }
+    ]
   });
-}
-
-// =====================
-// COMMIT
-// =====================
-function commit(text) {
-  chrome.input.ime.commitText({
-    contextID,
-    text: text
-  });
-
-  chrome.input.ime.clearComposition({ contextID });
-
-  rawBuffer = "";
-  cursor = 0;
 }
