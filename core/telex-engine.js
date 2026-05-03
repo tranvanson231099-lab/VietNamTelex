@@ -1,7 +1,3 @@
-// ===============================
-// TELEX ENGINE - FREE STYLE (LABAN LIKE)
-// ===============================
-
 export const TelexEngine = {
 
   toneMap: {
@@ -25,12 +21,12 @@ export const TelexEngine = {
   },
 
   // =====================
-  // NORMALIZE FREE TELEX
+  // NORMALIZE (FIX NUỐT s f r x j)
   // =====================
   normalize(word) {
     let base = word.toLowerCase();
 
-    // 1. Biến đổi nguyên âm trước
+    // 1. Biến đổi nguyên âm
     base = base
       .replace(/dd/g, "đ")
       .replace(/aa/g, "â")
@@ -40,33 +36,40 @@ export const TelexEngine = {
       .replace(/ow/g, "ơ")
       .replace(/uw/g, "ư");
 
-    // 2. Lấy dấu thanh (giữ dấu cuối cùng)
+    // 2. Kiểm tra có nguyên âm không
+    const hasVowel = /[aeiouyăâêôơư]/.test(base);
+
+    // ❗ KHÔNG có nguyên âm → không xử lý dấu
+    if (!hasVowel) return base;
+
+    // 3. Tách dấu (chỉ khi có nguyên âm)
     let tone = "";
-    base = base.replace(/[sfrxj]/g, (m) => {
-      tone = m;
-      return "";
-    });
+    let clean = "";
 
-    if (!tone) return base;
-
-    // 3. Đặt dấu vào nguyên âm gần cuối
-    for (let i = base.length - 1; i >= 0; i--) {
-      const char = base[i];
-      const toneMap = this.toneMap[char];
-
-      if (toneMap && toneMap[tone]) {
-        return base.slice(0, i) + toneMap[tone] + base.slice(i + 1);
+    for (let c of base) {
+      if ("sfrxj".includes(c)) {
+        tone = c; // lấy dấu cuối cùng
+      } else {
+        clean += c;
       }
     }
 
-    return base;
+    if (!tone) return clean;
+
+    // 4. Đặt dấu
+    for (let i = clean.length - 1; i >= 0; i--) {
+      const char = clean[i];
+      const toneMap = this.toneMap[char];
+
+      if (toneMap && toneMap[tone]) {
+        return clean.slice(0, i) + toneMap[tone] + clean.slice(i + 1);
+      }
+    }
+
+    return clean;
   },
 
-  // =====================
-  // PROCESS
-  // =====================
   process(buffer, key) {
-    const raw = buffer + key;
-    return this.normalize(raw);
+    return this.normalize(buffer + key);
   }
 };

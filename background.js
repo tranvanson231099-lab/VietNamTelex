@@ -3,30 +3,21 @@ import { TelexEngine } from './core/telex-engine.js';
 
 let activeContextID = 0;
 
-// =====================
-// FOCUS
-// =====================
 chrome.input.ime.onFocus.addListener((c) => {
   activeContextID = c.contextID;
   BufferManager.clear();
 });
 
-// =====================
-// BLUR
-// =====================
 chrome.input.ime.onBlur.addListener(() => {
   activeContextID = 0;
   BufferManager.clear();
 });
 
-// =====================
-// KEY EVENT
-// =====================
 chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
 
   if (keyData.type !== "keydown" || activeContextID === 0) return false;
 
-  // Không chặn Ctrl/Cmd
+  // ✅ Không chặn shortcut
   if (keyData.ctrlKey || keyData.altKey || keyData.metaKey) {
     return false;
   }
@@ -116,17 +107,25 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
 
     const raw = BufferManager.get() + key;
 
-    const newText = TelexEngine.normalize(raw);
+    // ✅ chỉ normalize khi có nguyên âm
+    if (/[aeiouy]/.test(raw)) {
 
-    BufferManager.update(newText);
+      const newText = TelexEngine.normalize(raw);
 
-    chrome.input.ime.setComposition({
-      contextID: activeContextID,
-      text: newText,
-      cursor: newText.length
-    });
+      BufferManager.update(newText);
 
-    return true;
+      chrome.input.ime.setComposition({
+        contextID: activeContextID,
+        text: newText,
+        cursor: newText.length
+      });
+
+      return true;
+    }
+
+    // ❗ chưa có nguyên âm → gõ bình thường
+    BufferManager.add(key);
+    return false;
   }
 
   return false;
