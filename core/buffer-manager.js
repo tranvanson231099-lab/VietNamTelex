@@ -1,24 +1,27 @@
-// Quản lý bộ nhớ đệm
 export const BufferManager = {
     currentBuffer: "",
   
-    add: function(char) {
-      this.currentBuffer += char.toLowerCase();
+    add(char) {
+      this.currentBuffer += char;
     },
   
-    removeLast: function() {
+    removeLast() {
       this.currentBuffer = this.currentBuffer.slice(0, -1);
     },
   
-    clear: function() {
+    clear() {
       this.currentBuffer = "";
     },
   
-    get: function() {
+    get() {
       return this.currentBuffer;
     },
   
-    update: function(newText) {
-      this.currentBuffer = newText;
+    update(text) {
+      this.currentBuffer = text;
+    },
+  
+    hasData() {
+      return this.currentBuffer.length > 0;
     }
   };
