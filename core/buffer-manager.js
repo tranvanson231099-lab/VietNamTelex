@@ -2,7 +2,7 @@ export const BufferManager = {
   currentBuffer: "",
 
   add(char) {
-    this.currentBuffer += char; // lưu RAW
+    this.currentBuffer += char;
   },
 
   removeLast() {

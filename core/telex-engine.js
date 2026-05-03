@@ -14,55 +14,54 @@ export const TelexEngine = {
     y: { s: "ý", f: "ỳ", r: "ỷ", x: "ỹ", j: "ỵ" }
   },
 
-  // Danh sách phụ âm đầu (ưu tiên dài trước ngắn)
   initialConsonants: [
     "ngh", "ng", "nh", "ch", "tr", "ph", "th", "kh", "gi", "qu",
     "b", "c", "d", "đ", "g", "h", "k", "l", "m", "n", "p", "q", "r", "s", "t", "v", "x"
   ],
 
-  normalize(word) {
-    let raw = word.toLowerCase();
+  normalize(rawInput) {
+    let raw = rawInput.toLowerCase().trim();
 
-    // 1. Xử lý các ký tự đặc biệt
-    let processed = raw
+    if (!raw) return "";
+
+    // Ưu tiên thứ tự thay thế quan trọng (giống mobile Telex)
+    let text = raw
       .replace(/dd/g, "đ")
       .replace(/aa/g, "â")
       .replace(/ee/g, "ê")
       .replace(/oo/g, "ô")
       .replace(/aw/g, "ă")
-      .replace(/uw/g, "ư")
       .replace(/ow/g, "ơ")
-      .replace(/w/g, "ư");   // w cuối cùng thành ư
+      .replace(/uw/g, "ư")
+      .replace(/w/g, "ư");           // w đơn lẻ → ư
 
-    // 2. Tách dấu thanh (lấy dấu cuối cùng)
+    // Tách dấu thanh (lấy dấu cuối cùng như mobile)
     let tone = "";
-    let content = processed;
-    for (let i = processed.length - 1; i >= 0; i--) {
-      if ("sfrxj".includes(processed[i])) {
-        tone = processed[i];
-        content = processed.slice(0, i) + processed.slice(i + 1);
+    let content = text;
+    for (let i = text.length - 1; i >= 0; i--) {
+      if ("sfrxj".includes(text[i])) {
+        tone = text[i];
+        content = text.slice(0, i) + text.slice(i + 1);
         break;
       }
     }
-    if (!tone) return processed;
 
-    // 3. Phân tích cấu trúc âm tiết: Phụ âm đầu - Nguyên âm - Âm cuối
+    if (!tone) return text;
+
     const { head, vowels, tail } = this.parseSyllable(content);
 
-    if (!vowels) return processed;
+    if (!vowels) return text;
 
-    // 4. Xác định nguyên âm mang dấu
     const markedVowels = this.applyTone(vowels, tail, tone);
 
     return head + markedVowels + tail;
   },
 
-  // Phân tích âm tiết chi tiết
   parseSyllable(str) {
     let head = "";
     let remaining = str;
 
-    // Tìm phụ âm đầu dài nhất
+    // Phụ âm đầu (ưu tiên dài trước)
     for (let init of this.initialConsonants) {
       if (remaining.startsWith(init)) {
         head = init;
@@ -71,54 +70,45 @@ export const TelexEngine = {
       }
     }
 
-    // Phần còn lại là nguyên âm + âm cuối
-    const vowelRegex = /^([aeiouyăâêôơư]+)(.*)$/;
-    const match = remaining.match(vowelRegex);
+    // Tách nguyên âm + âm cuối
+    // Cho phép nhiều nguyên âm hơn (oai, uye, iêu...)
+    const vowelMatch = remaining.match(/^([aeiouyăâêôơư]+)(.*)$/);
 
-    if (!match) {
+    if (!vowelMatch) {
       return { head: str, vowels: "", tail: "" };
     }
 
     return {
       head,
-      vowels: match[1],
-      tail: match[2]
+      vowels: vowelMatch[1],
+      tail: vowelMatch[2]
     };
   },
 
-  // Áp dụng dấu thanh theo quy tắc tiếng Việt
   applyTone(vowels, tail, tone) {
-    const v = vowels;
-    let targetIdx = 0;
+    let v = vowels;
+    let target = 0;
 
     if (v.length === 1) {
-      targetIdx = 0;
+      target = 0;
     } 
     else if (v.length === 2) {
-      // Các cặp nguyên âm ưu tiên dấu ở chữ sau
-      if (["oa", "oe", "uy", "ue", "uô", "yê", "iê", "ia", "ua"].includes(v)) {
-        targetIdx = 1;
+      // Quy tắc mobile phổ biến
+      if (tail.length > 0 || 
+          /^(oa|oe|uy|uô|uo|ie|ia|ya|yu)/.test(v)) {
+        target = 1;                    // dấu rơi vào nguyên âm thứ 2
       } else {
-        targetIdx = 0;
-      }
-
-      // Nếu có âm cuối thì dấu thường rơi vào nguyên âm thứ 2
-      if (tail.length > 0) {
-        targetIdx = 1;
+        target = 0;
       }
     } 
-    else if (v.length === 3) {
-      // Ví dụ: oai, uye, iêu, uôi, etc.
-      targetIdx = 1; // Nguyên âm giữa thường mang dấu
+    else if (v.length >= 3) {
+      // oai, uye, iêu, uôi, ayê...
+      target = 1; // thường là nguyên âm giữa
     }
 
-    const charToMark = v[targetIdx];
-    const markedChar = this.toneMap[charToMark]?.[tone] || charToMark;
+    const char = v[target];
+    const marked = this.toneMap[char]?.[tone] || char;
 
-    return v.substring(0, targetIdx) + markedChar + v.substring(targetIdx + 1);
-  },
-
-  process(buffer, key) {
-    return this.normalize(buffer + key);
+    return v.slice(0, target) + marked + v.slice(target + 1);
   }
 };
