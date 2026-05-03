@@ -1,131 +1,88 @@
+import { VietnameseVowelMap, ToneMap } from './core/vietnamese_vowel_map.js';
+// import { VietnamesePhonology } from './vietnamese_phonology.js'; // nếu cần dùng sau
+
 export const TelexEngine = {
+  // Sử dụng map chi tiết từ file của bạn
+  vowelMap: VietnameseVowelMap,
 
-  toneMap: {
-    a: { s: "á", f: "à", r: "ả", x: "ã", j: "ạ" },
-    ă: { s: "ắ", f: "ằ", r: "ẳ", x: "ẵ", j: "ặ" },
-    â: { s: "ấ", f: "ầ", r: "ẩ", x: "ẫ", j: "ậ" },
-
-    e: { s: "é", f: "è", r: "ẻ", x: "ẽ", j: "ẹ" },
-    ê: { s: "ế", f: "ề", r: "ể", x: "ễ", j: "ệ" },
-
-    i: { s: "í", f: "ì", r: "ỉ", x: "ĩ", j: "ị" },
-
-    o: { s: "ó", f: "ò", r: "ỏ", x: "õ", j: "ọ" },
-    ô: { s: "ố", f: "ồ", r: "ổ", x: "ỗ", j: "ộ" },
-    ơ: { s: "ớ", f: "ờ", r: "ở", x: "ỡ", j: "ợ" },
-
-    u: { s: "ú", f: "ù", r: "ủ", x: "ũ", j: "ụ" },
-    ư: { s: "ứ", f: "ừ", r: "ử", x: "ữ", j: "ự" },
-
-    y: { s: "ý", f: "ỳ", r: "ỷ", x: "ỹ", j: "ỵ" }
-  },
-
-  // =====================
-  // ÂM ĐẦU
-  // =====================
+  // Phụ âm đầu (kết hợp từ phonology)
   initialConsonants: [
     "ngh", "ng", "nh", "ch", "tr", "ph", "th", "kh", "gi", "qu",
-    "b","c","d","đ","g","h","k","l","m","n","p","q","r","s","t","v","x"
+    "b", "c", "d", "đ", "g", "h", "k", "l", "m", "n", "p", "q", "r", "s", "t", "v", "x"
   ],
 
-  // =====================
-  // NORMALIZE
-  // =====================
   normalize(rawInput) {
     if (!rawInput) return "";
 
-    let raw = rawInput.toLowerCase();
+    const raw = rawInput.toLowerCase();
 
-    // =====================
-    // 1. TÁCH DẤU
-    // =====================
-    let tone = "";
-    raw = raw.replace(/[sfrxj]/g, (m) => {
-      tone = m;
-      return "";
-    });
-
-    // =====================
-    // 2. TELEX → UTF
-    // =====================
-    raw = raw
-      .replace(/dd/g, "đ")
-      .replace(/aa/g, "â")
-      .replace(/aw/g, "ă")
-      .replace(/ee/g, "ê")
-      .replace(/oo/g, "ô")
-      .replace(/ow/g, "ơ")
-      .replace(/uw/g, "ư");
-
-    // =====================
-    // 3. TÁCH ÂM ĐẦU (FIX TR)
-    // =====================
-    let head = "";
-    let rest = raw;
-
-    for (let cons of this.initialConsonants) {
-      if (raw.startsWith(cons)) {
-        head = cons;
-        rest = raw.slice(cons.length);
+    // 1. XÁC ĐỊNH DẤU THANH
+    let toneKey = "";
+    let base = raw;
+    for (let i = raw.length - 1; i >= 0; i--) {
+      if ("sfrxj".includes(raw[i])) {   // z cũng có thể thêm nếu cần
+        toneKey = raw[i];
+        base = raw.slice(0, i) + raw.slice(i + 1);
         break;
       }
     }
 
-    // =====================
-    // 4. TÌM NGUYÊN ÂM
-    // =====================
-    const chars = rest.split("");
-    const vowels = [];
-    const vowelRegex = /[aeiouyăâêôơư]/;
-
-    for (let i = 0; i < chars.length; i++) {
-      if (vowelRegex.test(chars[i])) {
-        vowels.push(i);
+    // 2. XÁC ĐỊNH ÂM ĐẦU
+    let head = "";
+    let remaining = base;
+    for (let cons of this.initialConsonants) {
+      if (remaining.startsWith(cons)) {
+        head = cons;
+        remaining = remaining.slice(cons.length);
+        break;
       }
     }
 
-    if (vowels.length === 0 || !tone) {
-      return this.formatCase(head + rest, rawInput);
-    }
+    // 3. XỬ LÝ NGUYÊN ÂM + ÂM CUỐI
+    const { nucleus, coda } = this.parseVowels(remaining);
 
-    // =====================
-    // 5. CHỌN VỊ TRÍ ĐẶT DẤU
-    // =====================
-    let target;
+    // Thay thế đặc biệt cho nguyên âm
+    let processed = nucleus
+      .replace(/aw/g, "aw")
+      .replace(/ow/g, "ow")
+      .replace(/uw/g, "uw")
+      .replace(/w/g, "uw");   // w đơn → uw (ư)
 
-    if (vowels.length === 1) {
-      target = vowels[0];
-    } else if (vowels.length === 2) {
-      const pair = chars[vowels[0]] + chars[vowels[1]];
+    // Tìm trong VowelMap
+    let resultNucleus = processed;
 
-      if (["oa", "oe", "uy"].includes(pair)) {
-        target = vowels[0];
-      } else {
-        target = vowels[1];
+    // Thử các key trong map (ưu tiên key dài)
+    const keys = Object.keys(this.vowelMap).sort((a, b) => b.length - a.length);
+
+    for (let key of keys) {
+      if (processed === key || processed.startsWith(key)) {
+        const entries = this.vowelMap[key];
+        const toneIndex = ToneMap[toneKey] || 0;
+
+        if (entries && entries[toneIndex]) {
+          resultNucleus = entries[toneIndex].char;
+          break;
+        }
       }
-    } else {
-      target = vowels[1];
     }
 
-    // =====================
-    // 6. ÁP DẤU
-    // =====================
-    const char = chars[target];
-    const marked = this.toneMap[char]?.[tone];
+    const finalText = head + resultNucleus + coda;
 
-    if (marked) {
-      chars[target] = marked;
-    }
-
-    const result = head + chars.join("");
-    return this.formatCase(result, rawInput);
+    return this.formatCase(finalText, rawInput);
   },
 
-  // =====================
-  // GIỮ HOA CHỮ
-  // =====================
+  parseVowels(str) {
+    // Tách nguyên âm và âm cuối
+    const match = str.match(/^([aeiouyăâêôơưw]+)([a-z]*)$/);
+    if (!match) return { nucleus: str, coda: "" };
+
+    return {
+      nucleus: match[1],
+      coda: match[2]
+    };
+  },
+
   formatCase(result, original) {
-    if (!original) return result;
     if (original[0] === original[0].toUpperCase()) {
       return result.charAt(0).toUpperCase() + result.slice(1);
     }
