@@ -1,5 +1,5 @@
-import { BufferManager } from './buffer-manager.js';
-import { TelexEngine } from './telex-engine.js';
+import { BufferManager } from './core/buffer-manager.js';
+import { TelexEngine } from './core/telex-engine.js';
 
 // KHAI BÁO BIẾN Ở ĐÂY ĐỂ TRÁNH LỖI ReferenceError
 let activeContextID = 0;
