@@ -1,74 +1,56 @@
-import { BufferManager } from './core/buffer-manager.js';
-import { TelexEngine } from './core/telex-engine.js';
+import { BufferManager } from './buffer-manager.js';
+import { TelexEngine } from './telex-engine.js';
 
-// KHAI BÁO BIẾN Ở ĐÂY ĐỂ TRÁNH LỖI ReferenceError
 let activeContextID = 0;
 
-if (chrome.input && chrome.input.ime) {
+chrome.input.ime.onFocus.addListener((c) => { activeContextID = c.contextID; BufferManager.clear(); });
+chrome.input.ime.onBlur.addListener(() => { activeContextID = 0; BufferManager.clear(); });
 
-  // Cập nhật ID khi người dùng nhấn vào ô nhập liệu
-  chrome.input.ime.onFocus.addListener((context) => {
-    activeContextID = context.contextID;
+chrome.input.ime.onKeyEvent.addListener((engineID, keyData, requestId) => {
+  if (keyData.type === "keyup" || activeContextID === 0) return false;
+  if (keyData.ctrlKey || keyData.altKey) return false;
+
+  const key = keyData.key;
+
+  // Xử lý Backspace
+  if (key === "Backspace") {
+    BufferManager.removeLast();
+    return false; // Để hệ thống tự xóa
+  }
+
+  // Kết thúc từ
+  if (key === " " || key === "Enter") {
     BufferManager.clear();
-  });
+    return false;
+  }
 
-  // Xóa ID khi người dùng rời khỏi ô nhập liệu
-  chrome.input.ime.onBlur.addListener((contextID) => {
-    if (activeContextID === contextID) {
-      activeContextID = 0;
-      BufferManager.clear();
-    }
-  });
+  // Xử lý gõ phím chính
+  if (key.length === 1 && /[a-zA-Z]/.test(key)) {
+    const lastChar = BufferManager.get().slice(-1);
+    const result = TelexEngine.checkTransformation(lastChar, key);
 
-  // Lắng nghe phím bấm
-  chrome.input.ime.onKeyEvent.addListener((engineID, keyData, requestId) => {
-    // 1. Nếu là phím nhả ra (keyup) hoặc không có ô nhập liệu -> Cho qua
-    if (keyData.type === "keyup" || activeContextID === 0) return false;
+    if (result) {
+      // Gửi lệnh xóa và thay thế
+      chrome.input.ime.commitText({
+        contextID: activeContextID,
+        text: (result.shouldDelete ? "\b" : "") + result.transformed
+      });
 
-    // 2. Nếu dùng phím chức năng (Ctrl, Alt) -> Cho qua
-    if (keyData.ctrlKey || keyData.altKey) return false;
-
-    const key = keyData.key;
-
-    // 3. Xử lý xóa (Backspace)
-    if (key === "Backspace") {
-      BufferManager.removeLast();
-      return false; 
-    }
-
-    // 4. Xử lý phím ngắt từ (Space, Enter)
-    if (key === " " || key === "Enter" || key === "Tab") {
-      BufferManager.clear();
-      return false;
-    }
-
-    // 5. Xử lý gõ chữ cái
-    if (key.length === 1 && /[a-zA-Z]/.test(key)) {
-      const lastChar = BufferManager.get().slice(-1);
-      const result = TelexEngine.checkTransformation(lastChar, key);
-
-      if (result) {
-        // Có biến đổi Telex
-        chrome.input.ime.commitText({
-          contextID: activeContextID,
-          text: (result.shouldDelete ? "\b" : "") + result.transformed
-        });
-
-        // Cập nhật buffer
-        if (result.shouldDelete) {
-          BufferManager.update(BufferManager.get().slice(0, -1) + result.transformed);
-        } else {
-          BufferManager.add(result.transformed);
-        }
-
-        return true; // CHẶN PHÍM GỐC: Tránh lỗi lặp chữ (aa -> aâ)
+      // Cập nhật bộ nhớ đệm
+      if (result.shouldDelete) {
+        BufferManager.update(BufferManager.get().slice(0, -1) + result.transformed);
+      } else {
+        BufferManager.add(result.transformed);
       }
 
-      // Không phải Telex: Lưu vào buffer và để hệ thống gõ phím gốc
-      BufferManager.add(key.toLowerCase());
-      return false;
+      // QUAN TRỌNG: Trả về true để trình duyệt KHÔNG tự gõ phím gốc
+      return true; 
     }
 
-    return false; // Mặc định cho qua
-  });
-}
+    // Nếu không có biến đổi, lưu vào buffer và trả về false để phím hiện bình thường
+    BufferManager.add(key.toLowerCase());
+    return false;
+  }
+
+  return false;
+});
