@@ -20,22 +20,24 @@ export const TelexEngine = {
   ],
 
   normalize(rawInput) {
-    let raw = rawInput.toLowerCase().trim();
+    let raw = rawInput.toLowerCase();
 
     if (!raw) return "";
 
-    // Ưu tiên thứ tự thay thế quan trọng (giống mobile Telex)
+    // =====================
+    // THAY THẾ - Thứ tự cực kỳ quan trọng
+    // =====================
     let text = raw
       .replace(/dd/g, "đ")
       .replace(/aa/g, "â")
       .replace(/ee/g, "ê")
       .replace(/oo/g, "ô")
       .replace(/aw/g, "ă")
-      .replace(/ow/g, "ơ")
+      .replace(/ow/g, "ơ")      // ow trước w
       .replace(/uw/g, "ư")
-      .replace(/w/g, "ư");           // w đơn lẻ → ư
+      .replace(/w/g, "ư");       // w đơn lẻ
 
-    // Tách dấu thanh (lấy dấu cuối cùng như mobile)
+    // Tách dấu thanh (lấy dấu cuối)
     let tone = "";
     let content = text;
     for (let i = text.length - 1; i >= 0; i--) {
@@ -46,22 +48,30 @@ export const TelexEngine = {
       }
     }
 
-    if (!tone) return text;
+    if (!tone) return this.capitalize(text, rawInput);
 
     const { head, vowels, tail } = this.parseSyllable(content);
-
-    if (!vowels) return text;
+    if (!vowels) return this.capitalize(text, rawInput);
 
     const markedVowels = this.applyTone(vowels, tail, tone);
 
-    return head + markedVowels + tail;
+    const result = head + markedVowels + tail;
+    return this.capitalize(result, rawInput);
+  },
+
+  // Giữ nguyên hoa/thường theo input gốc
+  capitalize(result, original) {
+    if (original === original.toUpperCase()) return result.toUpperCase();
+    if (original[0] === original[0].toUpperCase()) {
+      return result.charAt(0).toUpperCase() + result.slice(1);
+    }
+    return result;
   },
 
   parseSyllable(str) {
     let head = "";
     let remaining = str;
 
-    // Phụ âm đầu (ưu tiên dài trước)
     for (let init of this.initialConsonants) {
       if (remaining.startsWith(init)) {
         head = init;
@@ -70,18 +80,15 @@ export const TelexEngine = {
       }
     }
 
-    // Tách nguyên âm + âm cuối
-    // Cho phép nhiều nguyên âm hơn (oai, uye, iêu...)
-    const vowelMatch = remaining.match(/^([aeiouyăâêôơư]+)(.*)$/);
-
-    if (!vowelMatch) {
+    const match = remaining.match(/^([aeiouyăâêôơư]+)(.*)$/);
+    if (!match) {
       return { head: str, vowels: "", tail: "" };
     }
 
     return {
       head,
-      vowels: vowelMatch[1],
-      tail: vowelMatch[2]
+      vowels: match[1],
+      tail: match[2]
     };
   },
 
@@ -93,17 +100,14 @@ export const TelexEngine = {
       target = 0;
     } 
     else if (v.length === 2) {
-      // Quy tắc mobile phổ biến
-      if (tail.length > 0 || 
-          /^(oa|oe|uy|uô|uo|ie|ia|ya|yu)/.test(v)) {
-        target = 1;                    // dấu rơi vào nguyên âm thứ 2
+      if (tail.length > 0 || /^(oa|oe|uy|uô|uo|ie|ia|ya|yu|ươ|ơu)/.test(v)) {
+        target = 1;
       } else {
         target = 0;
       }
     } 
     else if (v.length >= 3) {
-      // oai, uye, iêu, uôi, ayê...
-      target = 1; // thường là nguyên âm giữa
+      target = 1;
     }
 
     const char = v[target];
