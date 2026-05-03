@@ -4,7 +4,7 @@
   "manifest_version": 3,
   "permissions": ["input"],
   "background": {
-    "service_worker": "background.js",
+    "service_worker": "background.js"
   },
   "input_components": [
     {
