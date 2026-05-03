@@ -32,10 +32,6 @@ if (chrome.input && chrome.input.ime) {
     return false; // Indicates the key event was not handled.
   });
 
-  chrome.input.ime.onMenuItemClicked.addListener((engineID, name) => {
-    console.log("onMenuItemClicked", engineID, name);
-  });
-
   console.log("Custom IME listeners attached successfully.");
 
 } else {
