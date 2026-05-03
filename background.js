@@ -3,52 +3,64 @@ import { TelexEngine } from './core/telex-engine.js';
 
 let activeContextID = 0;
 
-chrome.input.ime.onFocus.addListener((c) => { activeContextID = c.contextID; BufferManager.clear(); });
-chrome.input.ime.onBlur.addListener(() => { activeContextID = 0; BufferManager.clear(); });
+chrome.input.ime.onFocus.addListener((c) => {
+  activeContextID = c.contextID;
+  BufferManager.clear();
+});
 
-chrome.input.ime.onKeyEvent.addListener((engineID, keyData, requestId) => {
-  if (keyData.type === "keyup" || activeContextID === 0) return false;
+chrome.input.ime.onBlur.addListener(() => {
+  activeContextID = 0;
+  BufferManager.clear();
+});
+
+chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
+  if (keyData.type !== "keydown" || activeContextID === 0) return false;
   if (keyData.ctrlKey || keyData.altKey) return false;
 
   const key = keyData.key;
 
-  // Xử lý Backspace
+  // =====================
+  // BACKSPACE
+  // =====================
   if (key === "Backspace") {
     BufferManager.removeLast();
-    return false; // Để hệ thống tự xóa
+    return false;
   }
 
-  // Kết thúc từ
+  // =====================
+  // KẾT THÚC TỪ
+  // =====================
   if (key === " " || key === "Enter") {
     BufferManager.clear();
     return false;
   }
 
-  // Xử lý gõ phím chính
+  // =====================
+  // XỬ LÝ CHỮ
+  // =====================
   if (key.length === 1 && /[a-zA-Z]/.test(key)) {
-    const lastChar = BufferManager.get().slice(-1);
-    const result = TelexEngine.checkTransformation(lastChar, key);
+
+    const buffer = BufferManager.get();
+
+    // 🔥 dùng API mới
+    const result = TelexEngine.process(buffer, key);
 
     if (result) {
-      // Gửi lệnh xóa và thay thế
+      // Xóa toàn bộ từ cũ
+      const deleteCount = buffer.length;
+      const deleteStr = "\b".repeat(deleteCount);
+
       chrome.input.ime.commitText({
         contextID: activeContextID,
-        text: (result.shouldDelete ? "\b" : "") + result.transformed
+        text: deleteStr + result.text
       });
 
-      // Cập nhật bộ nhớ đệm
-      if (result.shouldDelete) {
-        BufferManager.update(BufferManager.get().slice(0, -1) + result.transformed);
-      } else {
-        BufferManager.add(result.transformed);
-      }
+      // cập nhật buffer
+      BufferManager.update(result.text);
 
-      // QUAN TRỌNG: Trả về true để trình duyệt KHÔNG tự gõ phím gốc
-      return true; 
+      return true;
     }
 
-    // Nếu không có biến đổi, lưu vào buffer và trả về false để phím hiện bình thường
-    BufferManager.add(key.toLowerCase());
     return false;
   }
 
