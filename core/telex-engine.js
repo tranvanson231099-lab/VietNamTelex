@@ -1,11 +1,8 @@
-import { VietnameseVowelMap, ToneMap } from './core/vietnamese_vowel_map.js';
-// import { VietnamesePhonology } from './vietnamese_phonology.js'; // nếu cần dùng sau
+import { VietnameseVowelMap, ToneMap } from './vietnamese_vowel_map.js';
 
 export const TelexEngine = {
-  // Sử dụng map chi tiết từ file của bạn
   vowelMap: VietnameseVowelMap,
 
-  // Phụ âm đầu (kết hợp từ phonology)
   initialConsonants: [
     "ngh", "ng", "nh", "ch", "tr", "ph", "th", "kh", "gi", "qu",
     "b", "c", "d", "đ", "g", "h", "k", "l", "m", "n", "p", "q", "r", "s", "t", "v", "x"
@@ -14,20 +11,20 @@ export const TelexEngine = {
   normalize(rawInput) {
     if (!rawInput) return "";
 
-    const raw = rawInput.toLowerCase();
+    let raw = rawInput.toLowerCase();
 
-    // 1. XÁC ĐỊNH DẤU THANH
+    // 1. Tách dấu thanh
     let toneKey = "";
     let base = raw;
     for (let i = raw.length - 1; i >= 0; i--) {
-      if ("sfrxj".includes(raw[i])) {   // z cũng có thể thêm nếu cần
+      if ("sfrxjz".includes(raw[i])) {
         toneKey = raw[i];
         base = raw.slice(0, i) + raw.slice(i + 1);
         break;
       }
     }
 
-    // 2. XÁC ĐỊNH ÂM ĐẦU
+    // 2. Xác định âm đầu
     let head = "";
     let remaining = base;
     for (let cons of this.initialConsonants) {
@@ -38,23 +35,23 @@ export const TelexEngine = {
       }
     }
 
-    // 3. XỬ LÝ NGUYÊN ÂM + ÂM CUỐI
-    const { nucleus, coda } = this.parseVowels(remaining);
+    // 3. Phần còn lại là nguyên âm + âm cuối
+    let nucleus = remaining.replace(/[^aeiouyăâêôơưw]/g, ''); // chỉ giữ nguyên âm
+    let coda = remaining.replace(nucleus, '');
 
-    // Thay thế đặc biệt cho nguyên âm
+    // Thay thế w → uw, aw, ow...
     let processed = nucleus
       .replace(/aw/g, "aw")
       .replace(/ow/g, "ow")
       .replace(/uw/g, "uw")
-      .replace(/w/g, "uw");   // w đơn → uw (ư)
+      .replace(/w/g, "uw");
 
-    // Tìm trong VowelMap
-    let resultNucleus = processed;
+    // 4. Tra cứu trong VowelMap
+    let resultNucleus = processed; // fallback
 
-    // Thử các key trong map (ưu tiên key dài)
-    const keys = Object.keys(this.vowelMap).sort((a, b) => b.length - a.length);
+    const searchKeys = Object.keys(this.vowelMap).sort((a, b) => b.length - a.length);
 
-    for (let key of keys) {
+    for (let key of searchKeys) {
       if (processed === key || processed.startsWith(key)) {
         const entries = this.vowelMap[key];
         const toneIndex = ToneMap[toneKey] || 0;
@@ -66,20 +63,27 @@ export const TelexEngine = {
       }
     }
 
+    // Nếu không tìm thấy, thử cách thay thế cơ bản
+    if (resultNucleus === processed) {
+      resultNucleus = this.basicReplace(processed);
+    }
+
     const finalText = head + resultNucleus + coda;
 
     return this.formatCase(finalText, rawInput);
   },
 
-  parseVowels(str) {
-    // Tách nguyên âm và âm cuối
-    const match = str.match(/^([aeiouyăâêôơưw]+)([a-z]*)$/);
-    if (!match) return { nucleus: str, coda: "" };
-
-    return {
-      nucleus: match[1],
-      coda: match[2]
-    };
+  // Thay thế cơ bản khi map không match
+  basicReplace(str) {
+    return str
+      .replace(/aw/g, "ă")
+      .replace(/ow/g, "ơ")
+      .replace(/uw/g, "ư")
+      .replace(/w/g, "ư")
+      .replace(/aa/g, "â")
+      .replace(/ee/g, "ê")
+      .replace(/oo/g, "ô")
+      .replace(/dd/g, "đ");
   },
 
   formatCase(result, original) {
