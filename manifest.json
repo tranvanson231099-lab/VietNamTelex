@@ -5,7 +5,6 @@
   "permissions": ["input"],
   "background": {
     "service_worker": "background.js",
-    "type": "module"
   },
   "input_components": [
     {
