@@ -1,28 +1,44 @@
 import { BufferManager } from './core/buffer-manager.js';
 import { TelexEngine } from './core/telex-engine.js';
 
+// contextID của input hiện tại
 let activeContextID = 0;
 
 // =====================
-// FOCUS / BLUR
+// FOCUS: khi user click vào ô input
 // =====================
 chrome.input.ime.onFocus.addListener((c) => {
   activeContextID = c.contextID;
-  BufferManager.clear();
-});
 
-chrome.input.ime.onBlur.addListener(() => {
-  activeContextID = 0;
+  // reset buffer
   BufferManager.clear();
 });
 
 // =====================
-// KEY EVENT
+// BLUR: khi rời khỏi input
+// =====================
+chrome.input.ime.onBlur.addListener(() => {
+  activeContextID = 0;
+
+  // reset buffer để tránh lỗi
+  BufferManager.clear();
+});
+
+// =====================
+// XỬ LÝ PHÍM
 // =====================
 chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
 
+  // Chỉ xử lý keydown
   if (keyData.type !== "keydown" || activeContextID === 0) return false;
-  if (keyData.ctrlKey || keyData.altKey) return false;
+
+  // =====================
+  // QUAN TRỌNG:
+  // Không chặn shortcut (Ctrl+C, Ctrl+V...)
+  // =====================
+  if (keyData.ctrlKey || keyData.altKey || keyData.metaKey) {
+    return false;
+  }
 
   const key = keyData.key;
 
@@ -31,10 +47,13 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
   // =====================
   if (key === "Backspace") {
 
+    // Nếu đang gõ → IME xử lý
     if (BufferManager.hasData()) {
 
+      // Xóa ký tự trong buffer
       BufferManager.removeLast();
 
+      // Nếu còn chữ → update composition
       if (BufferManager.hasData()) {
         chrome.input.ime.setComposition({
           contextID: activeContextID,
@@ -42,19 +61,21 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
           cursor: BufferManager.get().length
         });
       } else {
+        // Nếu hết → xóa composition
         chrome.input.ime.clearComposition({
           contextID: activeContextID
         });
       }
 
-      return true;
+      return true; // chặn hệ thống
     }
 
+    // Không có buffer → để hệ thống xử lý
     return false;
   }
 
   // =====================
-  // ENTER (FIX CHUẨN)
+  // ENTER
   // =====================
   if (key === "Enter") {
 
@@ -66,6 +87,7 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
         text: BufferManager.get() + "\n"
       });
 
+      // Xóa composition
       chrome.input.ime.clearComposition({
         contextID: activeContextID
       });
@@ -74,7 +96,6 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
       return true;
     }
 
-    // Không gõ → để hệ thống xử lý Enter
     return false;
   }
 
@@ -83,6 +104,7 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
   // =====================
   if (key === " ") {
 
+    // Nếu đang gõ → commit từ
     if (BufferManager.hasData()) {
 
       chrome.input.ime.commitText({
@@ -102,22 +124,29 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
   }
 
   // =====================
-  // A-Z
+  // XỬ LÝ CHỮ A-Z
   // =====================
   if (key.length === 1 && /[a-zA-Z]/.test(key)) {
 
+    // Lấy buffer hiện tại
     const buffer = BufferManager.get();
+
+    // Gửi qua Telex engine
     const newText = TelexEngine.process(buffer, key);
 
+    // Update buffer
     BufferManager.update(newText);
 
+    // =====================
+    // HIỂN THỊ REALTIME
+    // =====================
     chrome.input.ime.setComposition({
       contextID: activeContextID,
       text: newText,
       cursor: newText.length
     });
 
-    return true;
+    return true; // chặn key gốc
   }
 
   return false;
