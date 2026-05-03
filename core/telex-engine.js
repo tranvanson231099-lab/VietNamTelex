@@ -14,12 +14,13 @@ export const TelexEngine = {
     y: { s: "ý", f: "ỳ", r: "ỷ", x: "ỹ", j: "ỵ" }
   },
 
+  // Quy tắc vị trí dấu cho nguyên âm kép và ba
   vowelToneRules: {
     "oa": 1, "oe": 1, "uy": 1, "uo": 1, "uô": 1,
     "ie": 1, "ia": 1, "ya": 1, "yu": 1,
-    "ươ": 1, "ưu": 1, "ơu": 1,
+    "ươ": 1, "ưu": 1, "ơu": 1, "uơ": 1,
     "ai": 1, "ay": 1, "âu": 1, "ôu": 1,
-    "uyê": 1, "uôi": 1, "oai": 1, "iêu": 1
+    "uyê": 1, "uye": 1, "uôi": 1, "oai": 1, "oay": 1, "iêu": 1, "uây": 1
   },
 
   initialConsonants: [
@@ -29,10 +30,10 @@ export const TelexEngine = {
 
   normalize(rawInput) {
     if (!rawInput) return "";
+    
+    let raw = rawInput.toLowerCase();
 
-    const raw = rawInput.toLowerCase();
-
-    // Tách dấu thanh trước
+    // ==================== 1. XÁC ĐỊNH DẤU THANH ====================
     let tone = "";
     let base = raw;
     for (let i = raw.length - 1; i >= 0; i--) {
@@ -43,30 +44,9 @@ export const TelexEngine = {
       }
     }
 
-    // Thay thế đặc biệt
-    let text = base
-      .replace(/dd/g, "đ")
-      .replace(/aa/g, "â")
-      .replace(/ee/g, "ê")
-      .replace(/oo/g, "ô")
-      .replace(/aw/g, "ă")
-      .replace(/ow/g, "ơ")
-      .replace(/uw/g, "ư")
-      .replace(/w/g, "ư");
-
-    if (!tone) return this.formatCase(text, rawInput);
-
-    const { head, nucleus, coda } = this.parseSyllable(text);
-    if (!nucleus) return this.formatCase(text, rawInput);
-
-    const marked = this.applyTone(nucleus, coda, tone);
-
-    return this.formatCase(head + marked + coda, rawInput);
-  },
-
-  parseSyllable(str) {
+    // ==================== 2. XÁC ĐỊNH ÂM ĐẦU ====================
     let head = "";
-    let remaining = str;
+    let remaining = base;
 
     for (let cons of this.initialConsonants) {
       if (remaining.startsWith(cons)) {
@@ -76,30 +56,60 @@ export const TelexEngine = {
       }
     }
 
-    const match = remaining.match(/^([aeiouyăâêôơư]+)([a-z]*)$/);
-    return match 
-      ? { head, nucleus: match[1], coda: match[2] }
-      : { head: str, nucleus: "", coda: "" };
+    // ==================== 3. XỬ LÝ NGUYÊN ÂM (1, 2, 3) + ÂM CUỐI ====================
+    const { nucleus, coda } = this.parseVowels(remaining);
+
+    // Thay thế ký tự đặc biệt (aw, ow, w...) sau khi tách âm đầu
+    let processedNucleus = nucleus
+      .replace(/aw/g, "ă")
+      .replace(/ow/g, "ơ")
+      .replace(/uw/g, "ư")
+      .replace(/w/g, "ư");
+
+    if (!tone) {
+      const result = head + processedNucleus + coda;
+      return this.formatCase(result, rawInput);
+    }
+
+    // Áp dụng dấu thanh vào nguyên âm
+    const markedNucleus = this.applyTone(processedNucleus, coda, tone);
+
+    const finalResult = head + markedNucleus + coda;
+    return this.formatCase(finalResult, rawInput);
+  },
+
+  // Xử lý nguyên âm 1 - 2 - 3 ký tự
+  parseVowels(str) {
+    const match = str.match(/^([aeiouyăâêôơư]*)([a-z]*)$/);
+    if (!match) return { nucleus: str, coda: "" };
+
+    return {
+      nucleus: match[1],
+      coda: match[2]
+    };
   },
 
   applyTone(nucleus, coda, tone) {
-    let v = nucleus;
-    let target = v.length > 1 ? 1 : 0;   // mặc định rơi vào nguyên âm sau
+    if (!nucleus) return nucleus;
 
-    // Áp dụng quy tắc đặc biệt
-    if (this.vowelToneRules[v] !== undefined) {
-      target = this.vowelToneRules[v];
+    let v = nucleus;
+    let target = 0;
+
+    if (v.length === 1) {
+      target = 0;
+    } else if (v.length >= 2) {
+      target = this.vowelToneRules[v] !== undefined ? this.vowelToneRules[v] : 1;
     }
 
-    // Ưu tiên khi có âm cuối (rất quan trọng cho vanw, sonw...)
+    // Ưu tiên khi có âm cuối (quan trọng cho vanw, sonw, ...n)
     if (coda.length > 0 && v.length >= 2) {
       target = 1;
     }
 
     const char = v[target];
-    const markedChar = this.toneMap[char]?.[tone] || char;
+    const marked = this.toneMap[char]?.[tone] || char;
 
-    return v.slice(0, target) + markedChar + v.slice(target + 1);
+    return v.slice(0, target) + marked + v.slice(target + 1);
   },
 
   formatCase(result, original) {
