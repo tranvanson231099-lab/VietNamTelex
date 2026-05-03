@@ -3,21 +3,24 @@ import { TelexEngine } from './core/telex-engine.js';
 
 let activeContextID = 0;
 
+// FOCUS
 chrome.input.ime.onFocus.addListener((c) => {
   activeContextID = c.contextID;
   BufferManager.clear();
 });
 
+// BLUR
 chrome.input.ime.onBlur.addListener(() => {
   activeContextID = 0;
   BufferManager.clear();
 });
 
+// KEY EVENT
 chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
 
   if (keyData.type !== "keydown" || activeContextID === 0) return false;
 
-  // ✅ Không chặn shortcut
+  // không chặn ctrl
   if (keyData.ctrlKey || keyData.altKey || keyData.metaKey) {
     return false;
   }
@@ -33,14 +36,14 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
 
       BufferManager.removeLast();
 
-      const newText = TelexEngine.normalize(BufferManager.get());
-      BufferManager.update(newText);
+      const raw = BufferManager.get();
+      const display = TelexEngine.normalize(raw);
 
-      if (newText) {
+      if (display) {
         chrome.input.ime.setComposition({
           contextID: activeContextID,
-          text: newText,
-          cursor: newText.length
+          text: display,
+          cursor: display.length
         });
       } else {
         chrome.input.ime.clearComposition({
@@ -61,9 +64,11 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
 
     if (BufferManager.hasData()) {
 
+      const text = TelexEngine.normalize(BufferManager.get());
+
       chrome.input.ime.commitText({
         contextID: activeContextID,
-        text: BufferManager.get() + "\n"
+        text: text + "\n"
       });
 
       chrome.input.ime.clearComposition({
@@ -84,9 +89,11 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
 
     if (BufferManager.hasData()) {
 
+      const text = TelexEngine.normalize(BufferManager.get());
+
       chrome.input.ime.commitText({
         contextID: activeContextID,
-        text: BufferManager.get() + " "
+        text: text + " "
       });
 
       chrome.input.ime.clearComposition({
@@ -105,27 +112,19 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
   // =====================
   if (key.length === 1 && /[a-zA-Z]/.test(key)) {
 
-    const raw = BufferManager.get() + key;
-
-    // ✅ chỉ normalize khi có nguyên âm
-    if (/[aeiouy]/.test(raw)) {
-
-      const newText = TelexEngine.normalize(raw);
-
-      BufferManager.update(newText);
-
-      chrome.input.ime.setComposition({
-        contextID: activeContextID,
-        text: newText,
-        cursor: newText.length
-      });
-
-      return true;
-    }
-
-    // ❗ chưa có nguyên âm → gõ bình thường
+    // ✅ lưu RAW
     BufferManager.add(key);
-    return false;
+
+    const raw = BufferManager.get();
+    const display = TelexEngine.normalize(raw);
+
+    chrome.input.ime.setComposition({
+      contextID: activeContextID,
+      text: display,
+      cursor: display.length
+    });
+
+    return true;
   }
 
   return false;

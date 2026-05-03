@@ -20,13 +20,10 @@ export const TelexEngine = {
     y: { s: "ý", f: "ỳ", r: "ỷ", x: "ỹ", j: "ỵ" }
   },
 
-  // =====================
-  // NORMALIZE (FIX NUỐT s f r x j)
-  // =====================
   normalize(word) {
     let base = word.toLowerCase();
 
-    // 1. Biến đổi nguyên âm
+    // biến đổi chữ
     base = base
       .replace(/dd/g, "đ")
       .replace(/aa/g, "â")
@@ -36,19 +33,15 @@ export const TelexEngine = {
       .replace(/ow/g, "ơ")
       .replace(/uw/g, "ư");
 
-    // 2. Kiểm tra có nguyên âm không
     const hasVowel = /[aeiouyăâêôơư]/.test(base);
-
-    // ❗ KHÔNG có nguyên âm → không xử lý dấu
     if (!hasVowel) return base;
 
-    // 3. Tách dấu (chỉ khi có nguyên âm)
     let tone = "";
     let clean = "";
 
     for (let c of base) {
       if ("sfrxj".includes(c)) {
-        tone = c; // lấy dấu cuối cùng
+        tone = c;
       } else {
         clean += c;
       }
@@ -56,7 +49,6 @@ export const TelexEngine = {
 
     if (!tone) return clean;
 
-    // 4. Đặt dấu
     for (let i = clean.length - 1; i >= 0; i--) {
       const char = clean[i];
       const toneMap = this.toneMap[char];
