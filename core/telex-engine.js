@@ -21,25 +21,33 @@ export const TelexEngine = {
   },
 
   // =====================
-  // NORMALIZE (FIX CHUẨN)
+  // ÂM ĐẦU
+  // =====================
+  initialConsonants: [
+    "ngh", "ng", "nh", "ch", "tr", "ph", "th", "kh", "gi", "qu",
+    "b","c","d","đ","g","h","k","l","m","n","p","q","r","s","t","v","x"
+  ],
+
+  // =====================
+  // NORMALIZE
   // =====================
   normalize(rawInput) {
     if (!rawInput) return "";
 
     let raw = rawInput.toLowerCase();
 
-    // ====================
-    // 1. LẤY DẤU THANH
-    // ====================
+    // =====================
+    // 1. TÁCH DẤU
+    // =====================
     let tone = "";
     raw = raw.replace(/[sfrxj]/g, (m) => {
       tone = m;
       return "";
     });
 
-    // ====================
-    // 2. CHUYỂN TELEX → UTF
-    // ====================
+    // =====================
+    // 2. TELEX → UTF
+    // =====================
     raw = raw
       .replace(/dd/g, "đ")
       .replace(/aa/g, "â")
@@ -49,64 +57,75 @@ export const TelexEngine = {
       .replace(/ow/g, "ơ")
       .replace(/uw/g, "ư");
 
-    // ❗ QUAN TRỌNG: KHÔNG replace w → ư
+    // =====================
+    // 3. TÁCH ÂM ĐẦU (FIX TR)
+    // =====================
+    let head = "";
+    let rest = raw;
 
-    // ====================
-    // 3. TÌM NGUYÊN ÂM
-    // ====================
+    for (let cons of this.initialConsonants) {
+      if (raw.startsWith(cons)) {
+        head = cons;
+        rest = raw.slice(cons.length);
+        break;
+      }
+    }
+
+    // =====================
+    // 4. TÌM NGUYÊN ÂM
+    // =====================
+    const chars = rest.split("");
+    const vowels = [];
     const vowelRegex = /[aeiouyăâêôơư]/;
-    const chars = raw.split("");
-
-    let vowelIndexes = [];
 
     for (let i = 0; i < chars.length; i++) {
       if (vowelRegex.test(chars[i])) {
-        vowelIndexes.push(i);
+        vowels.push(i);
       }
     }
 
-    if (vowelIndexes.length === 0 || !tone) {
-      return this.formatCase(raw, rawInput);
+    if (vowels.length === 0 || !tone) {
+      return this.formatCase(head + rest, rawInput);
     }
 
-    // ====================
-    // 4. CHỌN VỊ TRÍ ĐẶT DẤU
-    // ====================
-    let targetIndex;
+    // =====================
+    // 5. CHỌN VỊ TRÍ ĐẶT DẤU
+    // =====================
+    let target;
 
-    if (vowelIndexes.length === 1) {
-      targetIndex = vowelIndexes[0];
-    } else if (vowelIndexes.length === 2) {
+    if (vowels.length === 1) {
+      target = vowels[0];
+    } else if (vowels.length === 2) {
+      const pair = chars[vowels[0]] + chars[vowels[1]];
 
-      const pair = chars[vowelIndexes[0]] + chars[vowelIndexes[1]];
-
-      // các cặp đặc biệt
       if (["oa", "oe", "uy"].includes(pair)) {
-        targetIndex = vowelIndexes[0];
+        target = vowels[0];
       } else {
-        targetIndex = vowelIndexes[1];
+        target = vowels[1];
       }
-
     } else {
-      // 3 nguyên âm → đánh vào giữa
-      targetIndex = vowelIndexes[1];
+      target = vowels[1];
     }
 
-    // ====================
-    // 5. ÁP DỤNG DẤU
-    // ====================
-    const char = chars[targetIndex];
+    // =====================
+    // 6. ÁP DẤU
+    // =====================
+    const char = chars[target];
     const marked = this.toneMap[char]?.[tone];
 
     if (marked) {
-      chars[targetIndex] = marked;
+      chars[target] = marked;
     }
 
-    const result = chars.join("");
+    const result = head + chars.join("");
     return this.formatCase(result, rawInput);
   },
 
+  // =====================
+  // GIỮ HOA CHỮ
+  // =====================
   formatCase(result, original) {
+    if (!original) return result;
     if (original[0] === original[0].toUpperCase()) {
       return result.charAt(0).toUpperCase() + result.slice(1);
     }
