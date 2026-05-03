@@ -30,32 +30,64 @@ chrome.input.ime.onKeyEvent.addListener((engineID, keyData) => {
   // BACKSPACE
   // =====================
   if (key === "Backspace") {
-    BufferManager.removeLast();
 
     if (BufferManager.hasData()) {
-      chrome.input.ime.setComposition({
-        contextID: activeContextID,
-        text: BufferManager.get(),
-        cursor: BufferManager.get().length
-      });
-    } else {
-      chrome.input.ime.clearComposition({
-        contextID: activeContextID
-      });
+
+      BufferManager.removeLast();
+
+      if (BufferManager.hasData()) {
+        chrome.input.ime.setComposition({
+          contextID: activeContextID,
+          text: BufferManager.get(),
+          cursor: BufferManager.get().length
+        });
+      } else {
+        chrome.input.ime.clearComposition({
+          contextID: activeContextID
+        });
+      }
+
+      return true;
     }
 
-    return true;
+    return false;
   }
 
   // =====================
-  // SPACE / ENTER → COMMIT
+  // ENTER (FIX CHUẨN)
   // =====================
-  if (key === " " || key === "Enter") {
+  if (key === "Enter") {
 
+    // Nếu đang gõ → commit + xuống dòng
     if (BufferManager.hasData()) {
+
       chrome.input.ime.commitText({
         contextID: activeContextID,
-        text: BufferManager.get() + key
+        text: BufferManager.get() + "\n"
+      });
+
+      chrome.input.ime.clearComposition({
+        contextID: activeContextID
+      });
+
+      BufferManager.clear();
+      return true;
+    }
+
+    // Không gõ → để hệ thống xử lý Enter
+    return false;
+  }
+
+  // =====================
+  // SPACE
+  // =====================
+  if (key === " ") {
+
+    if (BufferManager.hasData()) {
+
+      chrome.input.ime.commitText({
+        contextID: activeContextID,
+        text: BufferManager.get() + " "
       });
 
       chrome.input.ime.clearComposition({
