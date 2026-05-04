@@ -9,7 +9,7 @@ export const TelexEngine = {
   ],
 
   normalize(rawInput) {
-    console.log(rawInput)
+    console.log(rawInput);
   }
 
   // normalize(rawInput) {
