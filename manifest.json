@@ -1,17 +1,21 @@
 {
-  "name": "VietFlex - Telex IME",
-  "version": "1.1",
   "manifest_version": 3,
-  "permissions": ["input"],
+  "name": "My Custom IME",
+  "version": "1.0",
+  "description": "Bộ gõ tùy chỉnh cho ChromeOS",
+  "permissions": [
+    "input"
+  ],
   "background": {
     "service_worker": "background.js"
   },
   "input_components": [
     {
-      "name": "VietFlex Telex",
-      "id": "vietnamtelex_ime",
+      "name": "Tiếng Việt",
+      "id": "my_custom_ime",
       "language": "vi",
-      "layouts": ["us"]
+      "layouts": ["us"],
+      "type": "ime"
     }
   ]
 }
